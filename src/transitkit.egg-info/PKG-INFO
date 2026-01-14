@@ -42,14 +42,12 @@ Requires-Dist: seaborn>=0.12.0
 Requires-Dist: h5py>=3.9.0
 Requires-Dist: tables>=3.8.0
 Requires-Dist: pyarrow>=14.0.0
-Requires-Dist: click>=8.1.0
-Requires-Dist: rich>=13.5.0
 Requires-Dist: tqdm>=4.65.0
 Requires-Dist: joblib>=1.3.0
 Requires-Dist: pyyaml>=6.0
 Requires-Dist: packaging>=23.1
 Requires-Dist: batman-package>=2.4.9
-Requires-Dist: ellc>=1.9.0
+Requires-Dist: ellc>=1.8.11
 Requires-Dist: rich>=13.5.0
 Requires-Dist: click>=8.1.0
 Provides-Extra: test
@@ -60,6 +58,10 @@ Requires-Dist: pytest-mock>=3.11.0; extra == "test"
 Requires-Dist: pytest-timeout>=2.2.0; extra == "test"
 Requires-Dist: pytest-benchmark>=4.0.0; extra == "test"
 Requires-Dist: hypothesis>=6.85.0; extra == "test"
+Provides-Extra: io
+Requires-Dist: h5py>=3.9.0; extra == "io"
+Requires-Dist: tables>=3.8.0; extra == "io"
+Requires-Dist: pyarrow>=14.0.0; extra == "io"
 Provides-Extra: dev
 Requires-Dist: black>=23.9.0; extra == "dev"
 Requires-Dist: isort>=5.12.0; extra == "dev"
@@ -98,7 +100,12 @@ Requires-Dist: numpy_groupies>=0.9.20; extra == "performance"
 Requires-Dist: dask>=2023.9.0; extra == "performance"
 Requires-Dist: zarr>=2.16.0; extra == "performance"
 Provides-Extra: all
-Requires-Dist: transitkit[advanced,dev,docs,ground,performance,test]; extra == "all"
+Requires-Dist: transitkit[test]; extra == "all"
+Requires-Dist: transitkit[dev]; extra == "all"
+Requires-Dist: transitkit[docs]; extra == "all"
+Requires-Dist: transitkit[advanced]; extra == "all"
+Requires-Dist: transitkit[ground]; extra == "all"
+Requires-Dist: transitkit[performance]; extra == "all"
 
 # TransitKit 🪐
 

@@ -76,7 +76,7 @@ dependencies = [
     
     # Advanced transit modeling (optional but recommended)
     "batman-package>=2.4.9",
-    "ellc>=1.9.0",
+    "ellc>=1.8.11",  # Fixed: Latest available version is 1.8.11
     "rich>=13.5.0",
     "click>=8.1.0",
 ]
@@ -153,7 +153,12 @@ performance = [
 
 # All extras
 all = [
-    "transitkit[test,dev,docs,advanced,ground,performance]",
+    "transitkit[test]",
+    "transitkit[dev]",
+    "transitkit[docs]",
+    "transitkit[advanced]",
+    "transitkit[ground]",
+    "transitkit[performance]",
 ]
 
 [project.urls]
