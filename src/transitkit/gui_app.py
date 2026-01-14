@@ -1,14 +1,23 @@
 """
-TransitKit GUI (Tkinter)
+TransitKit GUI (Tkinter) – improved multi-sector plotting + transit events + better period.
 
-Tabs:
-- Simulate: build a synthetic transit, plot, run BLS
-- TESS Explorer: NEA lookup -> auto TIC -> list sectors/cadences -> download selected -> stitch -> plot -> BLS -> export
+New features:
+- Multi-sector plot modes:
+    * Per-sector panels (recommended when >1 sector)
+    * Stitched (absolute BTJD, with gaps)
+    * Concatenated (removes gaps so you "see it like one long sector")
+- Transit event tools:
+    * Show Transit Markers (vertical lines at predicted/fit mid-transits)
+    * Transit Viewer (select individual events and zoom)
+- Better period estimation:
+    * Preprocess per sector: remove_nans -> remove_outliers -> normalize -> flatten
+    * BLS search narrowed around NEA period (if available)
+    * Refine ephemeris by measuring mid-transit times and fitting linear ephemeris
 
 Requires:
-- core: numpy, matplotlib, astropy (already in your deps)
-- TESS tab: lightkurve (install with: pip install -e ".[tess]" if you add that extra)
-- NEA lookup uses only stdlib (nea.py)
+- numpy, matplotlib, astropy (already)
+- lightkurve for TESS tab
+- transitkit.nea (NEA TAP client)
 """
 
 from __future__ import annotations
@@ -21,17 +30,17 @@ from tkinter import ttk, messagebox, filedialog
 import numpy as np
 import transitkit as tkit
 
-# NASA Exoplanet Archive helper
 from transitkit.nea import lookup_planet
 
-# Matplotlib embedding for Tkinter
 import matplotlib
-matplotlib.use("TkAgg")  # good default for Windows desktop popups
-
+matplotlib.use("TkAgg")
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
 
 
+# -------------------------
+# small helpers
+# -------------------------
 def _safe_float(s: str, default: float) -> float:
     try:
         return float(s)
@@ -47,7 +56,6 @@ def _safe_int(s: str, default: int) -> int:
 
 
 def choose_nea_row(parent, rows: list[dict]) -> dict | None:
-    """If multiple NEA matches exist, let user pick one."""
     if not rows:
         return None
     if len(rows) == 1:
@@ -55,11 +63,11 @@ def choose_nea_row(parent, rows: list[dict]) -> dict | None:
 
     win = tk.Toplevel(parent)
     win.title("Select planet (NASA Exoplanet Archive)")
-    win.geometry("860x320")
+    win.geometry("920x340")
 
     ttk.Label(win, text="Multiple matches found. Select one:", padding=(10, 8)).pack(anchor="w")
 
-    lb = tk.Listbox(win, selectmode=tk.SINGLE, width=140, height=10)
+    lb = tk.Listbox(win, selectmode=tk.SINGLE, width=150, height=10)
     lb.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
 
     for i, r in enumerate(rows):
@@ -92,50 +100,186 @@ def choose_nea_row(parent, rows: list[dict]) -> dict | None:
     return choice["row"]
 
 
+# -------------------------
+# Plot panel (supports 1 or N axes)
+# -------------------------
 class PlotPanel(ttk.Frame):
     def __init__(self, parent, title=""):
         super().__init__(parent)
         self.fig = Figure(figsize=(8, 4), dpi=100)
-        self.ax = self.fig.add_subplot(111)
-        self.ax.set_title(title)
+        self.axes = [self.fig.add_subplot(111)]
+        self.axes[0].set_title(title)
 
         self.canvas = FigureCanvasTkAgg(self.fig, master=self)
         self.canvas.draw()
         self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        toolbar = NavigationToolbar2Tk(self.canvas, self)
-        toolbar.update()
-        toolbar.pack(side=tk.TOP, fill=tk.X)
+        self.toolbar = NavigationToolbar2Tk(self.canvas, self)
+        self.toolbar.update()
+        self.toolbar.pack(side=tk.TOP, fill=tk.X)
 
-    def plot_xy(self, x, y, xlabel="", ylabel="", title="", style="k.", alpha=0.6, ms=2):
-        self.ax.clear()
-        self.ax.plot(x, y, style, alpha=alpha, markersize=ms)
-        self.ax.set_xlabel(xlabel)
-        self.ax.set_ylabel(ylabel)
-        self.ax.set_title(title)
-        self.ax.grid(True, alpha=0.3)
+    def set_subplots(self, nrows: int):
+        """Rebuild figure layout with nrows subplots."""
+        self.fig.clf()
+        if nrows <= 1:
+            ax = self.fig.add_subplot(111)
+            self.axes = [ax]
+        else:
+            axs = self.fig.subplots(nrows, 1, sharey=True)
+            self.axes = list(axs) if isinstance(axs, (list, np.ndarray)) else [axs]
         self.fig.tight_layout()
         self.canvas.draw()
 
-    def plot_line(self, x, y, xlabel="", ylabel="", title="", lw=2):
-        self.ax.clear()
-        self.ax.plot(x, y, linewidth=lw)
-        self.ax.set_xlabel(xlabel)
-        self.ax.set_ylabel(ylabel)
-        self.ax.set_title(title)
-        self.ax.grid(True, alpha=0.3)
+    def plot_xy(self, x, y, xlabel="", ylabel="", title="", style="k.", alpha=0.6, ms=2, ax_index=0):
+        ax = self.axes[ax_index]
+        ax.clear()
+        ax.plot(x, y, style, alpha=alpha, markersize=ms)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.grid(True, alpha=0.3)
         self.fig.tight_layout()
         self.canvas.draw()
 
-    def vline(self, x, color="r", ls="--", alpha=0.4, lw=1, label=None):
-        self.ax.axvline(x=x, color=color, linestyle=ls, alpha=alpha, linewidth=lw, label=label)
+    def plot_line(self, x, y, xlabel="", ylabel="", title="", lw=2, ax_index=0):
+        ax = self.axes[ax_index]
+        ax.clear()
+        ax.plot(x, y, linewidth=lw)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel(ylabel)
+        ax.set_title(title)
+        ax.grid(True, alpha=0.3)
+        self.fig.tight_layout()
+        self.canvas.draw()
+
+    def vline(self, x, color="r", ls="--", alpha=0.35, lw=1, label=None, ax_index=0):
+        ax = self.axes[ax_index]
+        ax.axvline(x=x, color=color, linestyle=ls, alpha=alpha, linewidth=lw, label=label)
 
 
+# -------------------------
+# Transit mid-time measurement + ephemeris fit
+# -------------------------
+def _measure_midtime_box_grid(t, f, tc_pred, duration, grid_n=401):
+    """
+    Very robust mid-transit estimator:
+    - scan a grid of trial centers around tc_pred
+    - choose the center that minimizes in-transit median flux (max depth)
+    - then refine using a local quadratic fit on score vs shift
+    """
+    # window for local evaluation
+    w = 3.0 * duration
+    m = (t >= tc_pred - w) & (t <= tc_pred + w)
+    if np.sum(m) < 30:
+        return None
+
+    tt = t[m]
+    ff = f[m]
+
+    # normalize locally to reduce slow trends
+    med = np.nanmedian(ff)
+    if not np.isfinite(med) or med == 0:
+        return None
+    ff = ff / med
+
+    # grid of center shifts
+    shifts = np.linspace(-duration, duration, grid_n)
+    scores = np.full_like(shifts, np.nan, dtype=float)
+
+    half = 0.5 * duration
+    for i, s in enumerate(shifts):
+        tc = tc_pred + s
+        in_tr = (tt >= tc - half) & (tt <= tc + half)
+        if np.sum(in_tr) < 6:
+            continue
+        # score: lower in-transit median is better (deeper)
+        scores[i] = np.nanmedian(ff[in_tr])
+
+    if not np.any(np.isfinite(scores)):
+        return None
+
+    j = int(np.nanargmin(scores))
+    # quadratic refinement around j (use up to 5 points)
+    j0 = max(0, j - 2)
+    j1 = min(len(shifts), j + 3)
+    x = shifts[j0:j1]
+    y = scores[j0:j1]
+    m2 = np.isfinite(y)
+    if np.sum(m2) >= 3:
+        x = x[m2]
+        y = y[m2]
+        # fit y = a x^2 + b x + c ; min at -b/(2a)
+        a, b, c = np.polyfit(x, y, 2)
+        if a != 0:
+            s_ref = -b / (2 * a)
+            s_ref = float(np.clip(s_ref, -duration, duration))
+            return tc_pred + s_ref
+
+    return tc_pred + float(shifts[j])
+
+
+def estimate_transit_midtimes(time, flux, period, t0, duration):
+    """
+    Build predicted transit centers across the time span and measure mid-times locally.
+    Returns list of (n, tc_meas).
+    """
+    tmin, tmax = float(np.nanmin(time)), float(np.nanmax(time))
+    n_start = int(np.floor((tmin - t0) / period)) - 1
+    n_end = int(np.ceil((tmax - t0) / period)) + 1
+
+    out = []
+    for n in range(n_start, n_end + 1):
+        tc_pred = t0 + n * period
+        if tc_pred < tmin - 2 * duration or tc_pred > tmax + 2 * duration:
+            continue
+        tc_meas = _measure_midtime_box_grid(time, flux, tc_pred, duration)
+        if tc_meas is not None:
+            out.append((n, float(tc_meas)))
+    return out
+
+
+def fit_linear_ephemeris(ns, tcs):
+    """
+    Fit tc = t0 + n*P by least squares.
+    Returns t0, P, sigma_t0, sigma_P, residuals
+    """
+    ns = np.asarray(ns, dtype=float)
+    tcs = np.asarray(tcs, dtype=float)
+    if ns.size < 3:
+        return None
+
+    n0 = np.mean(ns)
+    x = ns - n0
+    A = np.vstack([np.ones_like(x), x]).T
+
+    coeff, _, _, _ = np.linalg.lstsq(A, tcs, rcond=None)
+    c0, P = coeff  # tc ~ c0 + P*(n-n0)
+    t0 = c0 - P * n0
+
+    model = t0 + P * ns
+    resid = tcs - model
+
+    dof = max(1, ns.size - 2)
+    s2 = np.sum(resid**2) / dof
+    cov = s2 * np.linalg.inv(A.T @ A)
+    sigma_c0 = np.sqrt(cov[0, 0])
+    sigma_P = np.sqrt(cov[1, 1])
+
+    # sigma_t0 same as sigma_c0 in this parameterization (t0 is derived)
+    # Good enough for display purposes:
+    sigma_t0 = sigma_c0
+
+    return float(t0), float(P), float(sigma_t0), float(sigma_P), resid
+
+
+# -------------------------
+# Main App
+# -------------------------
 class TransitKitGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("TransitKit")
-        self.geometry("1120x720")
+        self.geometry("1180x760")
 
         self.nb = ttk.Notebook(self)
         self.nb.pack(fill=tk.BOTH, expand=True)
@@ -147,145 +291,23 @@ class TransitKitGUI(tk.Tk):
         self.nb.add(self.tess_tab, text="TESS Explorer")
 
         # buffers
-        self.sim_time = None
-        self.sim_flux = None
-
-        self.tess_lc = None
+        self.tess_segments = []  # list of dicts: {"sector":int/str, "time":np.array, "flux":np.array}
         self.tess_time = None
         self.tess_flux = None
 
-        self._sr = None
+        # ephemeris state (NEA or refined)
+        self.ephem_period = None
+        self.ephem_t0 = None  # BTJD
+        self.ephem_duration = None  # days
+
         self._sr_filtered = None
 
         self._build_simulate_tab()
         self._build_tess_tab()
 
-    # ---------------------------
-    # Simulate tab
-    # ---------------------------
+    # minimal simulate tab (kept simple)
     def _build_simulate_tab(self):
-        left = ttk.Frame(self.sim_tab, padding=10)
-        left.pack(side=tk.LEFT, fill=tk.Y)
-
-        right = ttk.Frame(self.sim_tab, padding=10)
-        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        ttk.Label(left, text="Synthetic System", font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 8))
-
-        self.sim_period = tk.StringVar(value="5.0")
-        self.sim_depth = tk.StringVar(value="0.02")
-        self.sim_duration = tk.StringVar(value="0.15")
-        self.sim_baseline = tk.StringVar(value="30.0")
-        self.sim_npoints = tk.StringVar(value="3000")
-        self.sim_noise = tk.StringVar(value="0.001")
-        self.sim_seed = tk.StringVar(value="42")
-
-        grid = ttk.Frame(left)
-        grid.pack(fill=tk.X)
-
-        def row(label, var, r):
-            ttk.Label(grid, text=label).grid(row=r, column=0, sticky="w", pady=2)
-            ttk.Entry(grid, textvariable=var, width=12).grid(row=r, column=1, sticky="w", pady=2)
-
-        row("Period (days)", self.sim_period, 0)
-        row("Depth (frac)", self.sim_depth, 1)
-        row("Duration (days)", self.sim_duration, 2)
-        row("Baseline (days)", self.sim_baseline, 3)
-        row("N points", self.sim_npoints, 4)
-        row("Noise sigma", self.sim_noise, 5)
-        row("RNG seed", self.sim_seed, 6)
-
-        ttk.Separator(left).pack(fill=tk.X, pady=10)
-
-        ttk.Label(left, text="BLS Search", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 6))
-        self.sim_minp = tk.StringVar(value="1.0")
-        self.sim_maxp = tk.StringVar(value="20.0")
-
-        grid2 = ttk.Frame(left)
-        grid2.pack(fill=tk.X)
-
-        ttk.Label(grid2, text="Min P (days)").grid(row=0, column=0, sticky="w", pady=2)
-        ttk.Entry(grid2, textvariable=self.sim_minp, width=12).grid(row=0, column=1, sticky="w", pady=2)
-        ttk.Label(grid2, text="Max P (days)").grid(row=1, column=0, sticky="w", pady=2)
-        ttk.Entry(grid2, textvariable=self.sim_maxp, width=12).grid(row=1, column=1, sticky="w", pady=2)
-
-        ttk.Button(left, text="Simulate & Plot", command=self.on_simulate).pack(fill=tk.X, pady=(10, 4))
-        ttk.Button(left, text="Run BLS", command=self.on_sim_bls).pack(fill=tk.X, pady=4)
-
-        self.sim_status = ttk.Label(left, text="Ready.", wraplength=280)
-        self.sim_status.pack(fill=tk.X, pady=(10, 0))
-
-        self.sim_plot = PlotPanel(right, title="Synthetic Light Curve")
-        self.sim_plot.pack(fill=tk.BOTH, expand=True)
-
-    def on_simulate(self):
-        P = _safe_float(self.sim_period.get(), 5.0)
-        depth = _safe_float(self.sim_depth.get(), 0.02)
-        dur = _safe_float(self.sim_duration.get(), 0.15)
-        baseline = _safe_float(self.sim_baseline.get(), 30.0)
-        n = _safe_int(self.sim_npoints.get(), 3000)
-        sigma = _safe_float(self.sim_noise.get(), 0.001)
-        seed = _safe_int(self.sim_seed.get(), 42)
-
-        if n < 50:
-            messagebox.showerror("Invalid input", "N points must be >= 50.")
-            return
-        if P <= 0 or dur <= 0 or baseline <= 0:
-            messagebox.showerror("Invalid input", "Period, duration, baseline must be positive.")
-            return
-
-        rng = np.random.default_rng(seed)
-        time = np.linspace(0.0, baseline, n)
-        clean = tkit.generate_transit_signal(time, period=P, depth=depth, duration=dur)
-        noisy = clean + rng.normal(0.0, sigma, size=n)
-
-        self.sim_time = time
-        self.sim_flux = noisy
-
-        self.sim_plot.plot_xy(time, noisy, xlabel="Time (days)", ylabel="Normalized Flux",
-                              title="Synthetic Transit Light Curve (Noisy)",
-                              style="k.", alpha=0.6, ms=2)
-
-        # reference transit centers consistent with your generator (t0=P/2)
-        t0 = P / 2.0
-        ntr = int(time[-1] / P) + 1
-        for i in range(ntr):
-            self.sim_plot.vline(t0 + i * P, color="r", alpha=0.25)
-
-        self.sim_status.config(text=f"Simulated. P={P:.6f} d | depth={depth:.5f} | dur={dur:.4f} d | noise={sigma:.4f}")
-
-    def on_sim_bls(self):
-        if self.sim_time is None or self.sim_flux is None:
-            messagebox.showinfo("No data", "Click 'Simulate & Plot' first.")
-            return
-
-        minP = _safe_float(self.sim_minp.get(), 1.0)
-        maxP = _safe_float(self.sim_maxp.get(), 20.0)
-
-        try:
-            res = tkit.find_transits_box(self.sim_time, self.sim_flux, min_period=minP, max_period=maxP)
-        except Exception as e:
-            messagebox.showerror("BLS error", str(e))
-            return
-
-        bestP = res["period"]
-        periods = res.get("all_periods")
-        y = res.get("all_power", None)
-        ylabel = "BLS Power"
-        if y is None:
-            y = res.get("all_scores")
-            ylabel = "Detection Score"
-
-        if periods is None or y is None:
-            messagebox.showerror("Missing outputs", "find_transits_box must return all_periods and all_power/all_scores.")
-            return
-
-        self.sim_plot.plot_line(periods, y, xlabel="Period (days)", ylabel=ylabel, title="Period Search")
-        self.sim_plot.vline(bestP, color="g", alpha=0.7, label=f"Detected {bestP:.3f} d")
-        self.sim_plot.ax.legend(loc="best")
-        self.sim_plot.canvas.draw()
-
-        self.sim_status.config(text=f"BLS best period: {bestP:.8f} days")
+        ttk.Label(self.sim_tab, text="Use TESS Explorer tab for real data.").pack(anchor="w", padx=12, pady=12)
 
     # ---------------------------
     # TESS tab
@@ -301,42 +323,58 @@ class TransitKitGUI(tk.Tk):
 
         self.tess_target = tk.StringVar(value="HAT-P-36 b")
         self.tess_author = tk.StringVar(value="SPOC")
-        self.tess_cadence = tk.StringVar(value="Any")
+        self.tess_cadence = tk.StringVar(value="2-min (120s)")
+        self.plot_mode = tk.StringVar(value="Per-sector panels")  # default best for multi-sector
+
+        self.do_flatten = tk.BooleanVar(value=True)
+        self.do_outliers = tk.BooleanVar(value=True)
 
         ttk.Label(left, text="Planet name / Host / TIC:").pack(anchor="w")
-        ttk.Entry(left, textvariable=self.tess_target, width=34).pack(anchor="w", pady=(0, 6))
+        ttk.Entry(left, textvariable=self.tess_target, width=32).pack(anchor="w", pady=(0, 6))
 
         ttk.Label(left, text="Author:").pack(anchor="w")
-        ttk.Combobox(left, textvariable=self.tess_author, values=["SPOC", "QLP", "Any"], width=31, state="readonly").pack(anchor="w", pady=(0, 6))
+        ttk.Combobox(left, textvariable=self.tess_author, values=["SPOC", "QLP", "Any"], width=29, state="readonly").pack(anchor="w", pady=(0, 6))
 
         ttk.Label(left, text="Cadence:").pack(anchor="w")
         ttk.Combobox(
             left,
             textvariable=self.tess_cadence,
             values=["Any", "20-sec (20s)", "2-min (120s)", "10-min (600s)", "30-min (1800s)"],
-            width=31,
+            width=29,
+            state="readonly",
+        ).pack(anchor="w", pady=(0, 6))
+
+        ttk.Label(left, text="Plot mode:").pack(anchor="w")
+        ttk.Combobox(
+            left,
+            textvariable=self.plot_mode,
+            values=["Per-sector panels", "Stitched (absolute BTJD)", "Concatenated (no gaps)"],
+            width=29,
             state="readonly",
         ).pack(anchor="w", pady=(0, 8))
 
-        # Buttons (includes NEA fetch)
+        ttk.Checkbutton(left, text="Remove outliers", variable=self.do_outliers).pack(anchor="w")
+        ttk.Checkbutton(left, text="Flatten/detrend", variable=self.do_flatten).pack(anchor="w", pady=(0, 8))
+
         ttk.Button(left, text="Fetch NEA Params", command=self.on_nea_fetch).pack(fill=tk.X, pady=(6, 4))
         ttk.Button(left, text="Search TESS", command=self.on_tess_search).pack(fill=tk.X, pady=4)
         ttk.Button(left, text="Download Selected", command=self.on_tess_download).pack(fill=tk.X, pady=4)
-        ttk.Button(left, text="Run BLS on Stitched", command=self.on_tess_bls).pack(fill=tk.X, pady=4)
-        ttk.Button(left, text="Export CSV", command=self.on_tess_export).pack(fill=tk.X, pady=4)
 
         ttk.Separator(left).pack(fill=tk.X, pady=10)
 
+        ttk.Button(left, text="Run BLS (better)", command=self.on_tess_bls).pack(fill=tk.X, pady=4)
+        ttk.Button(left, text="Refine Ephemeris (high precision)", command=self.on_refine_ephemeris).pack(fill=tk.X, pady=4)
+        ttk.Button(left, text="Show Transit Markers", command=self.on_show_transit_markers).pack(fill=tk.X, pady=4)
+        ttk.Button(left, text="Transit Viewer", command=self.on_transit_viewer).pack(fill=tk.X, pady=4)
+        ttk.Button(left, text="Export CSV", command=self.on_tess_export).pack(fill=tk.X, pady=4)
+
+        ttk.Separator(left).pack(fill=tk.X, pady=10)
         ttk.Label(left, text="Available Light Curves:", font=("Segoe UI", 10, "bold")).pack(anchor="w")
 
-        self.tess_list = tk.Listbox(left, selectmode=tk.EXTENDED, width=52, height=18)
+        self.tess_list = tk.Listbox(left, selectmode=tk.EXTENDED, width=46, height=14)
         self.tess_list.pack(fill=tk.BOTH, expand=False)
 
-        self.tess_status = ttk.Label(
-            left,
-            text='Tip: install Lightkurve for TESS:  python -m pip install -e ".[tess]"',
-            wraplength=360
-        )
+        self.tess_status = ttk.Label(left, text="Ready.", wraplength=340)
         self.tess_status.pack(fill=tk.X, pady=(10, 0))
 
         self.tess_plot = PlotPanel(right, title="TESS Light Curve")
@@ -344,12 +382,12 @@ class TransitKitGUI(tk.Tk):
 
     def _require_lightkurve(self) -> bool:
         try:
-            import lightkurve as lk  # noqa: F401
+            import lightkurve  # noqa: F401
             return True
         except Exception:
             messagebox.showerror(
                 "Missing dependency",
-                'This feature requires lightkurve.\n\nInstall:\n  python -m pip install -e ".[tess]"'
+                'This feature requires lightkurve.\n\nInstall:\n  python -m pip install lightkurve'
             )
             return False
 
@@ -363,13 +401,13 @@ class TransitKitGUI(tk.Tk):
             return 600
         if s == "30-min (1800s)":
             return 1800
-        return None  # Any
+        return None
 
     # -------- NEA fetch --------
     def on_nea_fetch(self):
         q = self.tess_target.get().strip()
         if not q:
-            messagebox.showerror("Invalid input", "Enter a planet name (e.g., HAT-P-36 b) or hostname.")
+            messagebox.showerror("Invalid input", "Enter a planet name (e.g., HAT-P-36 b).")
             return
 
         self.tess_status.config(text="Querying NASA Exoplanet Archive (NEA)...")
@@ -395,32 +433,23 @@ class TransitKitGUI(tk.Tk):
                     tic = row.get("tic_id")
                     per = row.get("pl_orbper")          # days
                     dur_hr = row.get("pl_trandur")      # hours
-                    trandep = row.get("pl_trandep")     # percent
-                    ratror = row.get("pl_ratror")       # Rp/Rs
-
+                    tranmid_jd = row.get("pl_tranmid")  # JD
                     msg = f"NEA: {pl} | host={host} | TIC={tic} | P={per} d | dur={dur_hr} hr"
                     self.tess_status.config(text=msg)
 
-                    # Auto-fill simulate tab (nice convenience)
-                    try:
-                        if per is not None:
-                            self.sim_period.set(str(float(per)))
-                        if dur_hr is not None:
-                            self.sim_duration.set(str(float(dur_hr) / 24.0))
-                        if trandep is not None:
-                            self.sim_depth.set(str(float(trandep) / 100.0))
-                        elif ratror is not None:
-                            self.sim_depth.set(str(float(ratror) ** 2))
-                    except Exception:
-                        pass
+                    # store ephemeris from NEA if available
+                    if per is not None:
+                        self.ephem_period = float(per)
+                    if dur_hr is not None:
+                        self.ephem_duration = float(dur_hr) / 24.0
+                    if tranmid_jd is not None:
+                        # TESS time in Lightkurve is typically BTJD = BJD - 2457000
+                        self.ephem_t0 = float(tranmid_jd) - 2457000.0
 
-                    # Auto-search TESS by TIC if available (usually best)
+                    # if TIC exists, use it for Lightkurve search (usually best)
                     if tic not in (None, "", "null"):
                         self.tess_target.set(f"TIC {tic}")
                         self.on_tess_search()
-                    else:
-                        # If no TIC, user can still click Search TESS on planet/host text
-                        pass
 
                 self.after(0, apply)
 
@@ -430,11 +459,10 @@ class TransitKitGUI(tk.Tk):
 
         threading.Thread(target=work, daemon=True).start()
 
-    # -------- TESS search/download/analyze --------
+    # -------- TESS search --------
     def on_tess_search(self):
         if not self._require_lightkurve():
             return
-
         import lightkurve as lk
 
         target = self.tess_target.get().strip()
@@ -456,7 +484,7 @@ class TransitKitGUI(tk.Tk):
 
                 sr = lk.search_lightcurve(target, mission="TESS", **kw)
 
-                # Filter by cadence if exptime is present
+                # Filter by cadence if possible
                 if cadence is not None and len(sr) > 0:
                     tbl = sr.table
                     if "exptime" in tbl.colnames:
@@ -467,20 +495,16 @@ class TransitKitGUI(tk.Tk):
                 else:
                     sr_f = sr
 
-                self._sr = sr
                 self._sr_filtered = sr_f
 
                 for i, row in enumerate(sr_f.table):
-                    # Lightkurve commonly uses 'sequence_number' for sector
                     sector = row["sequence_number"] if "sequence_number" in row.colnames else row.get("sector", "NA")
                     exptime = row["exptime"] if "exptime" in row.colnames else "NA"
                     auth = row["author"] if "author" in row.colnames else author
-                    prod = row["productFilename"] if "productFilename" in row.colnames else ""
-                    label = f"[{i:02d}] Sector {sector} | exptime={exptime}s | author={auth} | {prod}"
+                    label = f"[{i:02d}] Sector {sector} | exptime={exptime}s | author={auth}"
                     self.tess_list.insert(tk.END, label)
 
-                msg = f"Found {len(sr_f)} light curve(s). Select one or more, then Download."
-                self.after(0, lambda: self.tess_status.config(text=msg))
+                self.after(0, lambda: self.tess_status.config(text=f"Found {len(sr_f)} light curve(s). Select & Download."))
 
             except Exception as e:
                 self.after(0, lambda: self.tess_status.config(text="Search failed."))
@@ -488,6 +512,7 @@ class TransitKitGUI(tk.Tk):
 
         threading.Thread(target=work, daemon=True).start()
 
+    # -------- Download + preprocess + plot --------
     def on_tess_download(self):
         if not self._require_lightkurve():
             return
@@ -509,26 +534,65 @@ class TransitKitGUI(tk.Tk):
                 if lcc is None or len(lcc) == 0:
                     raise RuntimeError("Download returned no light curves.")
 
-                lc = lcc.stitch().remove_nans()
+                segs = []
+                for lc in lcc:
+                    # identify sector
+                    sector = None
+                    try:
+                        sector = lc.meta.get("SECTOR", None)
+                    except Exception:
+                        sector = None
+                    if sector is None:
+                        try:
+                            sector = lc.meta.get("sequence_number", None)
+                        except Exception:
+                            sector = None
+                    if sector is None:
+                        sector = "NA"
 
-                self.tess_lc = lc
-                self.tess_time = np.array(lc.time.value, dtype=float)
-                self.tess_flux = np.array(lc.flux.value, dtype=float)
+                    lc2 = lc.remove_nans()
 
-                def plot_now():
-                    self.tess_plot.plot_xy(
-                        self.tess_time,
-                        self.tess_flux,
-                        xlabel="Time (days)",
-                        ylabel="Flux",
-                        title="TESS Stitched Light Curve",
-                        style="k.",
-                        alpha=0.6,
-                        ms=2,
-                    )
-                    self.tess_status.config(text=f"Downloaded & stitched {len(idxs)} item(s). Ready for BLS/export.")
+                    if self.do_outliers.get() and hasattr(lc2, "remove_outliers"):
+                        lc2 = lc2.remove_outliers(sigma=6)
 
-                self.after(0, plot_now)
+                    if hasattr(lc2, "normalize"):
+                        lc2 = lc2.normalize()
+
+                    if self.do_flatten.get() and hasattr(lc2, "flatten"):
+                        # window_length must be odd; tune later if needed
+                        lc2 = lc2.flatten(window_length=401, polyorder=2, break_tolerance=5)
+
+                    t = np.array(lc2.time.value, dtype=float)
+                    f = np.array(lc2.flux.value, dtype=float)
+
+                    # store
+                    segs.append({"sector": sector, "time": t, "flux": f})
+
+                # sort by sector when possible
+                def _sec_key(x):
+                    try:
+                        return int(x["sector"])
+                    except Exception:
+                        return 1_000_000
+
+                segs = sorted(segs, key=_sec_key)
+
+                # build stitched arrays for BLS/export
+                t_all = np.concatenate([s["time"] for s in segs])
+                f_all = np.concatenate([s["flux"] for s in segs])
+                o = np.argsort(t_all)
+                t_all = t_all[o]
+                f_all = f_all[o]
+
+                self.tess_segments = segs
+                self.tess_time = t_all
+                self.tess_flux = f_all
+
+                self.after(0, lambda: self._plot_segments())
+
+                self.after(0, lambda: self.tess_status.config(
+                    text=f"Downloaded {len(segs)} sector(s). Plot mode: {self.plot_mode.get()}."
+                ))
 
             except Exception as e:
                 self.after(0, lambda: self.tess_status.config(text="Download failed."))
@@ -536,50 +600,285 @@ class TransitKitGUI(tk.Tk):
 
         threading.Thread(target=work, daemon=True).start()
 
-    def on_tess_bls(self):
-        if self.tess_time is None or self.tess_flux is None:
-            messagebox.showinfo("No data", "Download and stitch a light curve first.")
+    def _plot_segments(self):
+        if not self.tess_segments:
             return
 
-        minP, maxP = 0.5, 20.0
+        mode = self.plot_mode.get()
+
+        if mode == "Per-sector panels" and len(self.tess_segments) > 1:
+            self.tess_plot.set_subplots(len(self.tess_segments))
+            for i, seg in enumerate(self.tess_segments):
+                sec = seg["sector"]
+                t = seg["time"]
+                f = seg["flux"]
+                ax = self.tess_plot.axes[i]
+                ax.clear()
+                ax.plot(t, f, "k.", alpha=0.6, markersize=2)
+                ax.set_title(f"Sector {sec}")
+                ax.set_ylabel("Flux")
+                ax.grid(True, alpha=0.3)
+                if i == len(self.tess_segments) - 1:
+                    ax.set_xlabel("Time (BTJD days)")
+            self.tess_plot.fig.tight_layout()
+            self.tess_plot.canvas.draw()
+            return
+
+        if mode == "Concatenated (no gaps)" and len(self.tess_segments) > 1:
+            self.tess_plot.set_subplots(1)
+            x_cat = []
+            y_cat = []
+            offset = 0.0
+            gap = 0.2  # days between sectors visually
+            for seg in self.tess_segments:
+                t = seg["time"]
+                f = seg["flux"]
+                dt = t - t[0]
+                x_cat.append(dt + offset)
+                y_cat.append(f)
+                offset += (dt[-1] - dt[0]) + gap
+            x = np.concatenate(x_cat)
+            y = np.concatenate(y_cat)
+            self.tess_plot.plot_xy(x, y, xlabel="Concatenated time (days)", ylabel="Flux",
+                                   title="TESS Concatenated Light Curve (no gaps)",
+                                   style="k.", alpha=0.6, ms=2)
+            return
+
+        # default: stitched absolute BTJD
+        self.tess_plot.set_subplots(1)
+        self.tess_plot.plot_xy(self.tess_time, self.tess_flux,
+                               xlabel="Time (BTJD days)", ylabel="Flux",
+                               title="TESS Stitched Light Curve (absolute BTJD)",
+                               style="k.", alpha=0.6, ms=2)
+
+    # -------- Better BLS: narrow around NEA period if available --------
+    def on_tess_bls(self):
+        if self.tess_time is None or self.tess_flux is None:
+            messagebox.showinfo("No data", "Download light curves first.")
+            return
+
+        # If NEA gave period, use a narrow range around it
+        if self.ephem_period is not None:
+            P0 = float(self.ephem_period)
+            minP = max(0.2, P0 - 0.05)
+            maxP = P0 + 0.05
+        else:
+            minP, maxP = 0.5, 20.0
+
+        # If NEA gave duration, help BLS with duration grid
+        durations = None
+        if self.ephem_duration is not None:
+            d0 = float(self.ephem_duration)
+            durations = np.linspace(max(0.01, 0.5 * d0), 1.5 * d0, 20)
 
         try:
-            res = tkit.find_transits_box(self.tess_time, self.tess_flux, min_period=minP, max_period=maxP)
+            res = tkit.find_transits_box(
+                self.tess_time,
+                self.tess_flux,
+                min_period=minP,
+                max_period=maxP,
+                durations=durations,
+                n_periods=20000 if (maxP - minP) <= 0.2 else 5000,
+            )
         except Exception as e:
             messagebox.showerror("BLS error", str(e))
             return
 
-        bestP = res["period"]
+        bestP = float(res["period"])
+        self.ephem_period = bestP  # update ephemeris period from BLS if NEA missing
+
         periods = res.get("all_periods")
-        y = res.get("all_power", None)
-        ylabel = "BLS Power"
-        if y is None:
-            y = res.get("all_scores")
-            ylabel = "Detection Score"
+        y = res.get("all_power", None) or res.get("all_scores")
+        ylabel = "BLS Power" if res.get("all_power", None) is not None else "Detection Score"
 
-        if periods is None or y is None:
-            messagebox.showerror("Missing outputs", "find_transits_box must return all_periods and all_power/all_scores.")
-            return
-
-        self.tess_plot.plot_line(periods, y, xlabel="Period (days)", ylabel=ylabel, title="TESS Period Search")
-        self.tess_plot.vline(bestP, color="g", alpha=0.7, label=f"Detected {bestP:.3f} d")
-        self.tess_plot.ax.legend(loc="best")
+        # Plot power
+        self.tess_plot.set_subplots(1)
+        self.tess_plot.plot_line(periods, y, xlabel="Period (days)", ylabel=ylabel, title="BLS Period Search")
+        self.tess_plot.vline(bestP, color="g", alpha=0.7, label=f"Detected {bestP:.6f} d")
+        self.tess_plot.axes[0].legend(loc="best")
         self.tess_plot.canvas.draw()
 
         extra = []
         if "t0" in res:
-            extra.append(f"t0={res['t0']:.4f}")
+            self.ephem_t0 = float(res["t0"])
+            extra.append(f"t0={self.ephem_t0:.4f}")
         if "duration" in res:
-            extra.append(f"dur={res['duration']:.4f}")
+            self.ephem_duration = float(res["duration"])
+            extra.append(f"dur={self.ephem_duration:.4f}")
         if "depth" in res:
-            extra.append(f"depth={res['depth']:.5f}")
+            extra.append(f"depth={float(res['depth']):.5f}")
 
-        msg = f"BLS best period: {bestP:.6f} d" + ((" | " + ", ".join(extra)) if extra else "")
-        self.tess_status.config(text=msg)
+        self.tess_status.config(text=f"BLS best period: {bestP:.8f} d | " + ", ".join(extra))
 
+    # -------- High precision: measure mid-times and fit linear ephemeris --------
+    def on_refine_ephemeris(self):
+        if self.tess_time is None or self.tess_flux is None:
+            messagebox.showinfo("No data", "Download light curves first.")
+            return
+
+        if self.ephem_period is None or self.ephem_t0 is None or self.ephem_duration is None:
+            messagebox.showinfo(
+                "Need ephemeris",
+                "Fetch NEA Params first (best) OR run BLS once to get initial period/t0/duration."
+            )
+            return
+
+        P0 = float(self.ephem_period)
+        t0 = float(self.ephem_t0)
+        dur = float(self.ephem_duration)
+
+        self.tess_status.config(text="Refining ephemeris from individual transit events...")
+
+        def work():
+            try:
+                mids = estimate_transit_midtimes(self.tess_time, self.tess_flux, P0, t0, dur)
+                if len(mids) < 5:
+                    raise RuntimeError(f"Only {len(mids)} transit events measured. Not enough for refinement.")
+
+                ns = np.array([m[0] for m in mids], dtype=float)
+                tcs = np.array([m[1] for m in mids], dtype=float)
+
+                fit = fit_linear_ephemeris(ns, tcs)
+                if fit is None:
+                    raise RuntimeError("Ephemeris fit failed.")
+
+                t0_fit, P_fit, s_t0, s_P, resid = fit
+
+                # update ephemeris
+                self.ephem_t0 = t0_fit
+                self.ephem_period = P_fit
+
+                def apply():
+                    self.tess_status.config(
+                        text=(
+                            f"Refined: P={P_fit:.9f} ± {s_P:.2e} d | "
+                            f"t0={t0_fit:.6f} (BTJD) | N={len(ns)} events"
+                        )
+                    )
+                    # after refine, re-plot stitched light curve (if you want) and allow markers
+                    self._plot_segments()
+
+                self.after(0, apply)
+
+            except Exception as e:
+                self.after(0, lambda: self.tess_status.config(text="Refine failed."))
+                self.after(0, lambda: messagebox.showerror("Refine error", str(e)))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    # -------- Show transit markers on current plot --------
+    def on_show_transit_markers(self):
+        if self.tess_time is None or self.tess_flux is None:
+            messagebox.showinfo("No data", "Download light curves first.")
+            return
+        if self.ephem_period is None or self.ephem_t0 is None or self.ephem_duration is None:
+            messagebox.showinfo("Need ephemeris", "Fetch NEA Params or run BLS/refine first.")
+            return
+
+        P = float(self.ephem_period)
+        t0 = float(self.ephem_t0)
+
+        # predicted centers across full timespan
+        tmin, tmax = float(np.nanmin(self.tess_time)), float(np.nanmax(self.tess_time))
+        n_start = int(np.floor((tmin - t0) / P)) - 1
+        n_end = int(np.ceil((tmax - t0) / P)) + 1
+        centers = [t0 + n * P for n in range(n_start, n_end + 1) if (t0 + n * P) >= tmin and (t0 + n * P) <= tmax]
+
+        # replot (so we don't accumulate infinite lines)
+        self._plot_segments()
+
+        mode = self.plot_mode.get()
+        if mode == "Per-sector panels" and len(self.tess_segments) > 1:
+            for i, seg in enumerate(self.tess_segments):
+                tseg = seg["time"]
+                tmin_s, tmax_s = float(tseg.min()), float(tseg.max())
+                for tc in centers:
+                    if tmin_s <= tc <= tmax_s:
+                        self.tess_plot.vline(tc, color="r", alpha=0.25, ax_index=i)
+            self.tess_plot.canvas.draw()
+        else:
+            for tc in centers:
+                self.tess_plot.vline(tc, color="r", alpha=0.25, ax_index=0)
+            self.tess_plot.canvas.draw()
+
+        self.tess_status.config(text=f"Plotted {len(centers)} transit markers using P={P:.9f} d")
+
+    # -------- Transit Viewer: pick events and zoom --------
+    def on_transit_viewer(self):
+        if self.tess_time is None or self.tess_flux is None:
+            messagebox.showinfo("No data", "Download light curves first.")
+            return
+        if self.ephem_period is None or self.ephem_t0 is None or self.ephem_duration is None:
+            messagebox.showinfo("Need ephemeris", "Fetch NEA Params or run BLS/refine first.")
+            return
+
+        P = float(self.ephem_period)
+        t0 = float(self.ephem_t0)
+        dur = float(self.ephem_duration)
+
+        tmin, tmax = float(np.nanmin(self.tess_time)), float(np.nanmax(self.tess_time))
+        n_start = int(np.floor((tmin - t0) / P)) - 1
+        n_end = int(np.ceil((tmax - t0) / P)) + 1
+        events = []
+        for n in range(n_start, n_end + 1):
+            tc = t0 + n * P
+            if tmin <= tc <= tmax:
+                events.append((n, tc))
+
+        if not events:
+            messagebox.showinfo("No events", "No predicted transit events in this time range.")
+            return
+
+        win = tk.Toplevel(self)
+        win.title("Transit Viewer")
+        win.geometry("1100x600")
+
+        left = ttk.Frame(win, padding=10)
+        left.pack(side=tk.LEFT, fill=tk.Y)
+
+        right = ttk.Frame(win, padding=10)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        ttk.Label(left, text="Select a transit event:").pack(anchor="w")
+        lb = tk.Listbox(left, width=30, height=25)
+        lb.pack(fill=tk.BOTH, expand=False)
+
+        for i, (n, tc) in enumerate(events):
+            lb.insert(tk.END, f"n={n:6d}  tc={tc:.6f}")
+
+        panel = PlotPanel(right, title="Transit Window")
+        panel.pack(fill=tk.BOTH, expand=True)
+
+        def plot_event(idx):
+            n, tc = events[idx]
+            w = 3.0 * dur
+            m = (self.tess_time >= tc - w) & (self.tess_time <= tc + w)
+            if np.sum(m) < 10:
+                return
+            tt = self.tess_time[m]
+            ff = self.tess_flux[m]
+            panel.set_subplots(1)
+            panel.plot_xy(tt, ff, xlabel="Time (BTJD)", ylabel="Flux",
+                          title=f"Transit n={n}  (tc={tc:.6f}, window=±{w:.3f} d)",
+                          style="k.", alpha=0.7, ms=3)
+            panel.vline(tc, color="r", alpha=0.4)
+            panel.canvas.draw()
+
+        def on_select(evt):
+            sel = lb.curselection()
+            if sel:
+                plot_event(int(sel[0]))
+
+        lb.bind("<<ListboxSelect>>", on_select)
+
+        # auto select first
+        lb.selection_set(0)
+        plot_event(0)
+
+    # -------- Export CSV (stitched arrays) --------
     def on_tess_export(self):
         if self.tess_time is None or self.tess_flux is None:
-            messagebox.showinfo("No data", "Download and stitch a light curve first.")
+            messagebox.showinfo("No data", "Download light curves first.")
             return
 
         path = filedialog.asksaveasfilename(
@@ -592,7 +891,7 @@ class TransitKitGUI(tk.Tk):
             return
 
         arr = np.column_stack([self.tess_time, self.tess_flux])
-        np.savetxt(path, arr, delimiter=",", header="time_days,flux", comments="")
+        np.savetxt(path, arr, delimiter=",", header="time_btjd,flux", comments="")
         self.tess_status.config(text=f"Exported: {os.path.basename(path)}")
 
 
