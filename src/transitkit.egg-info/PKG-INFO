@@ -1,40 +1,119 @@
 Metadata-Version: 2.4
 Name: transitkit
-Version: 0.1.0
-Summary: Exoplanet Transit Light Curve Analysis Toolkit
+Version: 2.0.0
+Summary: Professional Exoplanet Transit Light Curve Analysis Toolkit
 Author-email: Arif Solmaz <arif.solmaz@gmail.com>
+Maintainer-email: TransitKit Research Team <contact@transitkit.org>
 License: MIT
 Project-URL: Homepage, https://github.com/arifsolmaz/transitkit
-Requires-Python: >=3.8
+Project-URL: Documentation, https://transitkit.readthedocs.io
+Project-URL: Repository, https://github.com/arifsolmaz/transitkit.git
+Project-URL: Issues, https://github.com/arifsolmaz/transitkit/issues
+Project-URL: Changelog, https://github.com/arifsolmaz/transitkit/releases
+Project-URL: Cite this, https://doi.org/10.5281/zenodo.XXXXXXX
+Keywords: astronomy,exoplanets,transits,light-curves,tess,kepler,data-analysis,astrophysics
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Science/Research
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Classifier: Programming Language :: Python :: 3.12
+Classifier: Topic :: Scientific/Engineering :: Astronomy
+Classifier: Topic :: Scientific/Engineering :: Physics
+Classifier: Framework :: Matplotlib
+Classifier: Natural Language :: English
+Requires-Python: >=3.9
 Description-Content-Type: text/markdown
-Requires-Dist: numpy>=1.21.0
-Requires-Dist: matplotlib>=3.5.0
-Requires-Dist: scipy>=1.7.0
-Requires-Dist: astropy>=5.0.0
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: scipy>=1.10.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: astropy>=5.3.0
+Requires-Dist: lightkurve>=2.5.0
+Requires-Dist: astroquery>=0.4.7
+Requires-Dist: emcee>=3.1.4
+Requires-Dist: corner>=2.2.2
+Requires-Dist: scikit-learn>=1.3.0
+Requires-Dist: arviz>=0.16.0
+Requires-Dist: matplotlib>=3.7.0
+Requires-Dist: seaborn>=0.12.0
+Requires-Dist: h5py>=3.9.0
+Requires-Dist: tables>=3.8.0
+Requires-Dist: pyarrow>=14.0.0
+Requires-Dist: click>=8.1.0
+Requires-Dist: rich>=13.5.0
+Requires-Dist: tqdm>=4.65.0
+Requires-Dist: joblib>=1.3.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: packaging>=23.1
+Requires-Dist: batman-package>=2.4.9
+Requires-Dist: ellc>=1.9.0
+Requires-Dist: rich>=13.5.0
 Requires-Dist: click>=8.1.0
 Provides-Extra: test
-Requires-Dist: pytest>=7.0.0; extra == "test"
-Requires-Dist: pytest-cov>=4.0.0; extra == "test"
-Provides-Extra: tess
-Requires-Dist: lightkurve>=2.4.0; extra == "tess"
-Requires-Dist: pandas>=2.0.0; extra == "tess"
+Requires-Dist: pytest>=7.4.0; extra == "test"
+Requires-Dist: pytest-cov>=4.1.0; extra == "test"
+Requires-Dist: pytest-xdist>=3.5.0; extra == "test"
+Requires-Dist: pytest-mock>=3.11.0; extra == "test"
+Requires-Dist: pytest-timeout>=2.2.0; extra == "test"
+Requires-Dist: pytest-benchmark>=4.0.0; extra == "test"
+Requires-Dist: hypothesis>=6.85.0; extra == "test"
 Provides-Extra: dev
-Requires-Dist: black>=23.0.0; extra == "dev"
-Requires-Dist: flake8>=6.0.0; extra == "dev"
+Requires-Dist: black>=23.9.0; extra == "dev"
+Requires-Dist: isort>=5.12.0; extra == "dev"
+Requires-Dist: flake8>=6.1.0; extra == "dev"
+Requires-Dist: mypy>=1.5.0; extra == "dev"
+Requires-Dist: pre-commit>=3.4.0; extra == "dev"
+Requires-Dist: ruff>=0.1.0; extra == "dev"
+Requires-Dist: pylint>=3.0.0; extra == "dev"
+Requires-Dist: jupyter>=1.0.0; extra == "dev"
+Requires-Dist: ipython>=8.15.0; extra == "dev"
 Provides-Extra: docs
-Requires-Dist: sphinx>=7.0.0; extra == "docs"
-Requires-Dist: sphinx-rtd-theme>=1.3.0; extra == "docs"
+Requires-Dist: sphinx>=7.2.0; extra == "docs"
+Requires-Dist: sphinx-rtd-theme>=2.0.0; extra == "docs"
 Requires-Dist: myst-parser>=2.0.0; extra == "docs"
+Requires-Dist: sphinx-autodoc-typehints>=1.25.0; extra == "docs"
+Requires-Dist: sphinx-copybutton>=0.5.2; extra == "docs"
+Requires-Dist: nbsphinx>=0.9.0; extra == "docs"
+Requires-Dist: sphinx-gallery>=0.15.0; extra == "docs"
+Provides-Extra: advanced
+Requires-Dist: celerite2>=0.3.0; extra == "advanced"
+Requires-Dist: exoplanet>=0.6.0; extra == "advanced"
+Requires-Dist: pymc>=5.7.0; extra == "advanced"
+Requires-Dist: tinygp>=0.3.0; extra == "advanced"
+Requires-Dist: jax>=0.4.0; extra == "advanced"
+Requires-Dist: jaxlib>=0.4.0; extra == "advanced"
+Provides-Extra: ground
+Requires-Dist: ccdproc>=2.4.0; extra == "ground"
+Requires-Dist: photutils>=1.8.0; extra == "ground"
+Requires-Dist: astroalign>=2.4.0; extra == "ground"
+Requires-Dist: astroplan>=0.9.0; extra == "ground"
+Requires-Dist: astro-gala>=1.0.0; extra == "ground"
+Provides-Extra: performance
+Requires-Dist: numba>=0.58.0; extra == "performance"
+Requires-Dist: bottleneck>=1.3.7; extra == "performance"
+Requires-Dist: numpy_groupies>=0.9.20; extra == "performance"
+Requires-Dist: dask>=2023.9.0; extra == "performance"
+Requires-Dist: zarr>=2.16.0; extra == "performance"
+Provides-Extra: all
+Requires-Dist: transitkit[advanced,dev,docs,ground,performance,test]; extra == "all"
 
 # TransitKit 🪐
 
 [![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Tests](https://github.com/arifsolmaz/transitkit/actions/workflows/test.yml/badge.svg)](https://github.com/arifsolmaz/transitkit/actions/workflows/test.yml)
+[![PyPI version](https://badge.fury.io/py/transitkit.svg)](https://badge.fury.io/py/transitkit)
 
 **Exoplanet Transit Light Curve Analysis Toolkit**
 
+---
+
 ## 📦 Installation
 
+### From PyPI (Recommended)
+
 ```bash
-pip install git+https://github.com/arifsolmaz/transitkit.git
+pip install transitkit
