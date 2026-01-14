@@ -3,11 +3,12 @@ TransitKit GUI (Tkinter)
 
 Tabs:
 - Simulate: build a synthetic transit, plot, run BLS
-- TESS: search available sectors/cadences, download selected, stitch, plot, run BLS, export CSV
+- TESS Explorer: NEA lookup -> auto TIC -> list sectors/cadences -> download selected -> stitch -> plot -> BLS -> export
 
 Requires:
-- core: numpy, matplotlib, astropy (already)
-- TESS tab: lightkurve (optional: pip install "transitkit[tess]")
+- core: numpy, matplotlib, astropy (already in your deps)
+- TESS tab: lightkurve (install with: pip install -e ".[tess]" if you add that extra)
+- NEA lookup uses only stdlib (nea.py)
 """
 
 from __future__ import annotations
@@ -18,12 +19,14 @@ import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
 import numpy as np
-
 import transitkit as tkit
+
+# NASA Exoplanet Archive helper
+from transitkit.nea import lookup_planet
 
 # Matplotlib embedding for Tkinter
 import matplotlib
-matplotlib.use("TkAgg")  # ensures popup figures/canvas work on Windows
+matplotlib.use("TkAgg")  # good default for Windows desktop popups
 
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
@@ -43,6 +46,52 @@ def _safe_int(s: str, default: int) -> int:
         return default
 
 
+def choose_nea_row(parent, rows: list[dict]) -> dict | None:
+    """If multiple NEA matches exist, let user pick one."""
+    if not rows:
+        return None
+    if len(rows) == 1:
+        return rows[0]
+
+    win = tk.Toplevel(parent)
+    win.title("Select planet (NASA Exoplanet Archive)")
+    win.geometry("860x320")
+
+    ttk.Label(win, text="Multiple matches found. Select one:", padding=(10, 8)).pack(anchor="w")
+
+    lb = tk.Listbox(win, selectmode=tk.SINGLE, width=140, height=10)
+    lb.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+
+    for i, r in enumerate(rows):
+        pl = r.get("pl_name")
+        host = r.get("hostname")
+        tic = r.get("tic_id")
+        per = r.get("pl_orbper")
+        dur = r.get("pl_trandur")
+        lb.insert(tk.END, f"[{i:02d}] {pl} | host={host} | TIC={tic} | P={per} d | dur={dur} hr")
+
+    choice = {"row": None}
+
+    def ok():
+        sel = lb.curselection()
+        if sel:
+            choice["row"] = rows[int(sel[0])]
+        win.destroy()
+
+    def cancel():
+        win.destroy()
+
+    btns = ttk.Frame(win)
+    btns.pack(fill=tk.X, padx=10, pady=(0, 10))
+    ttk.Button(btns, text="Use selected", command=ok).pack(side=tk.LEFT)
+    ttk.Button(btns, text="Cancel", command=cancel).pack(side=tk.LEFT, padx=(8, 0))
+
+    win.transient(parent)
+    win.grab_set()
+    parent.wait_window(win)
+    return choice["row"]
+
+
 class PlotPanel(ttk.Frame):
     def __init__(self, parent, title=""):
         super().__init__(parent)
@@ -57,10 +106,6 @@ class PlotPanel(ttk.Frame):
         toolbar = NavigationToolbar2Tk(self.canvas, self)
         toolbar.update()
         toolbar.pack(side=tk.TOP, fill=tk.X)
-
-    def clear(self):
-        self.ax.clear()
-        self.canvas.draw()
 
     def plot_xy(self, x, y, xlabel="", ylabel="", title="", style="k.", alpha=0.6, ms=2):
         self.ax.clear()
@@ -90,7 +135,7 @@ class TransitKitGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("TransitKit")
-        self.geometry("1100x700")
+        self.geometry("1120x720")
 
         self.nb = ttk.Notebook(self)
         self.nb.pack(fill=tk.BOTH, expand=True)
@@ -101,12 +146,16 @@ class TransitKitGUI(tk.Tk):
         self.nb.add(self.sim_tab, text="Simulate")
         self.nb.add(self.tess_tab, text="TESS Explorer")
 
-        # State buffers
+        # buffers
         self.sim_time = None
         self.sim_flux = None
-        self.tess_lc = None  # stitched LightCurve (if available)
+
+        self.tess_lc = None
         self.tess_time = None
         self.tess_flux = None
+
+        self._sr = None
+        self._sr_filtered = None
 
         self._build_simulate_tab()
         self._build_tess_tab()
@@ -121,7 +170,6 @@ class TransitKitGUI(tk.Tk):
         right = ttk.Frame(self.sim_tab, padding=10)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
-        # Inputs
         ttk.Label(left, text="Synthetic System", font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 8))
 
         self.sim_period = tk.StringVar(value="5.0")
@@ -152,24 +200,21 @@ class TransitKitGUI(tk.Tk):
         ttk.Label(left, text="BLS Search", font=("Segoe UI", 10, "bold")).pack(anchor="w", pady=(0, 6))
         self.sim_minp = tk.StringVar(value="1.0")
         self.sim_maxp = tk.StringVar(value="20.0")
+
         grid2 = ttk.Frame(left)
         grid2.pack(fill=tk.X)
 
-        row2 = lambda label, var, r: (
-            ttk.Label(grid2, text=label).grid(row=r, column=0, sticky="w", pady=2),
-            ttk.Entry(grid2, textvariable=var, width=12).grid(row=r, column=1, sticky="w", pady=2),
-        )
-        row2("Min P (days)", self.sim_minp, 0)
-        row2("Max P (days)", self.sim_maxp, 1)
+        ttk.Label(grid2, text="Min P (days)").grid(row=0, column=0, sticky="w", pady=2)
+        ttk.Entry(grid2, textvariable=self.sim_minp, width=12).grid(row=0, column=1, sticky="w", pady=2)
+        ttk.Label(grid2, text="Max P (days)").grid(row=1, column=0, sticky="w", pady=2)
+        ttk.Entry(grid2, textvariable=self.sim_maxp, width=12).grid(row=1, column=1, sticky="w", pady=2)
 
-        # Buttons
         ttk.Button(left, text="Simulate & Plot", command=self.on_simulate).pack(fill=tk.X, pady=(10, 4))
         ttk.Button(left, text="Run BLS", command=self.on_sim_bls).pack(fill=tk.X, pady=4)
 
-        self.sim_status = ttk.Label(left, text="Ready.", wraplength=260)
+        self.sim_status = ttk.Label(left, text="Ready.", wraplength=280)
         self.sim_status.pack(fill=tk.X, pady=(10, 0))
 
-        # Plot panel
         self.sim_plot = PlotPanel(right, title="Synthetic Light Curve")
         self.sim_plot.pack(fill=tk.BOTH, expand=True)
 
@@ -201,16 +246,13 @@ class TransitKitGUI(tk.Tk):
                               title="Synthetic Transit Light Curve (Noisy)",
                               style="k.", alpha=0.6, ms=2)
 
-        # mark expected centers (for reference only)
+        # reference transit centers consistent with your generator (t0=P/2)
         t0 = P / 2.0
         ntr = int(time[-1] / P) + 1
         for i in range(ntr):
             self.sim_plot.vline(t0 + i * P, color="r", alpha=0.25)
 
-        self.sim_plot.ax.legend_.remove() if self.sim_plot.ax.legend_ else None
-        self.sim_plot.canvas.draw()
-
-        self.sim_status.config(text=f"Simulated. P={P:.4f} d, depth={depth:.4f}, duration={dur:.4f} d, noise={sigma:.4f}")
+        self.sim_status.config(text=f"Simulated. P={P:.6f} d | depth={depth:.5f} | dur={dur:.4f} d | noise={sigma:.4f}")
 
     def on_sim_bls(self):
         if self.sim_time is None or self.sim_flux is None:
@@ -227,9 +269,6 @@ class TransitKitGUI(tk.Tk):
             return
 
         bestP = res["period"]
-        self.sim_status.config(text=f"BLS best period: {bestP:.6f} days")
-
-        # Plot power/score
         periods = res.get("all_periods")
         y = res.get("all_power", None)
         ylabel = "BLS Power"
@@ -242,9 +281,11 @@ class TransitKitGUI(tk.Tk):
             return
 
         self.sim_plot.plot_line(periods, y, xlabel="Period (days)", ylabel=ylabel, title="Period Search")
-        self.sim_plot.vline(bestP, color="g", alpha=0.6, label=f"Detected {bestP:.3f} d")
+        self.sim_plot.vline(bestP, color="g", alpha=0.7, label=f"Detected {bestP:.3f} d")
         self.sim_plot.ax.legend(loc="best")
         self.sim_plot.canvas.draw()
+
+        self.sim_status.config(text=f"BLS best period: {bestP:.8f} days")
 
     # ---------------------------
     # TESS tab
@@ -258,26 +299,28 @@ class TransitKitGUI(tk.Tk):
 
         ttk.Label(left, text="TESS Explorer", font=("Segoe UI", 11, "bold")).pack(anchor="w", pady=(0, 8))
 
-        self.tess_target = tk.StringVar(value="HAT-P-36")
+        self.tess_target = tk.StringVar(value="HAT-P-36 b")
         self.tess_author = tk.StringVar(value="SPOC")
         self.tess_cadence = tk.StringVar(value="Any")
 
-        ttk.Label(left, text="Target (name or TIC):").pack(anchor="w")
-        ttk.Entry(left, textvariable=self.tess_target, width=28).pack(anchor="w", pady=(0, 6))
+        ttk.Label(left, text="Planet name / Host / TIC:").pack(anchor="w")
+        ttk.Entry(left, textvariable=self.tess_target, width=34).pack(anchor="w", pady=(0, 6))
 
         ttk.Label(left, text="Author:").pack(anchor="w")
-        ttk.Combobox(left, textvariable=self.tess_author, values=["SPOC", "QLP", "Any"], width=25, state="readonly").pack(anchor="w", pady=(0, 6))
+        ttk.Combobox(left, textvariable=self.tess_author, values=["SPOC", "QLP", "Any"], width=31, state="readonly").pack(anchor="w", pady=(0, 6))
 
         ttk.Label(left, text="Cadence:").pack(anchor="w")
         ttk.Combobox(
             left,
             textvariable=self.tess_cadence,
             values=["Any", "20-sec (20s)", "2-min (120s)", "10-min (600s)", "30-min (1800s)"],
-            width=25,
+            width=31,
             state="readonly",
         ).pack(anchor="w", pady=(0, 8))
 
-        ttk.Button(left, text="Search", command=self.on_tess_search).pack(fill=tk.X, pady=(6, 4))
+        # Buttons (includes NEA fetch)
+        ttk.Button(left, text="Fetch NEA Params", command=self.on_nea_fetch).pack(fill=tk.X, pady=(6, 4))
+        ttk.Button(left, text="Search TESS", command=self.on_tess_search).pack(fill=tk.X, pady=4)
         ttk.Button(left, text="Download Selected", command=self.on_tess_download).pack(fill=tk.X, pady=4)
         ttk.Button(left, text="Run BLS on Stitched", command=self.on_tess_bls).pack(fill=tk.X, pady=4)
         ttk.Button(left, text="Export CSV", command=self.on_tess_export).pack(fill=tk.X, pady=4)
@@ -286,29 +329,27 @@ class TransitKitGUI(tk.Tk):
 
         ttk.Label(left, text="Available Light Curves:", font=("Segoe UI", 10, "bold")).pack(anchor="w")
 
-        self.tess_list = tk.Listbox(left, selectmode=tk.EXTENDED, width=45, height=18)
+        self.tess_list = tk.Listbox(left, selectmode=tk.EXTENDED, width=52, height=18)
         self.tess_list.pack(fill=tk.BOTH, expand=False)
 
-        self.tess_status = ttk.Label(left, text="TESS tab requires lightkurve. Install: pip install -e \"./.[tess]\"",
-                                     wraplength=300)
+        self.tess_status = ttk.Label(
+            left,
+            text='Tip: install Lightkurve for TESS:  python -m pip install -e ".[tess]"',
+            wraplength=360
+        )
         self.tess_status.pack(fill=tk.X, pady=(10, 0))
 
-        # Plot panel
         self.tess_plot = PlotPanel(right, title="TESS Light Curve")
         self.tess_plot.pack(fill=tk.BOTH, expand=True)
 
-        # Internal search result storage
-        self._sr = None
-        self._sr_filtered = None
-
-    def _require_lightkurve(self):
+    def _require_lightkurve(self) -> bool:
         try:
             import lightkurve as lk  # noqa: F401
             return True
         except Exception:
             messagebox.showerror(
                 "Missing dependency",
-                "This feature requires lightkurve.\n\nInstall:\n  python -m pip install -e \".[tess]\""
+                'This feature requires lightkurve.\n\nInstall:\n  python -m pip install -e ".[tess]"'
             )
             return False
 
@@ -324,6 +365,72 @@ class TransitKitGUI(tk.Tk):
             return 1800
         return None  # Any
 
+    # -------- NEA fetch --------
+    def on_nea_fetch(self):
+        q = self.tess_target.get().strip()
+        if not q:
+            messagebox.showerror("Invalid input", "Enter a planet name (e.g., HAT-P-36 b) or hostname.")
+            return
+
+        self.tess_status.config(text="Querying NASA Exoplanet Archive (NEA)...")
+
+        def work():
+            try:
+                rows = lookup_planet(q, default_only=True, limit=25)
+                if not rows:
+                    rows = lookup_planet(q, default_only=False, limit=25)
+
+                def apply():
+                    if not rows:
+                        self.tess_status.config(text="NEA: no matches found.")
+                        return
+
+                    row = choose_nea_row(self, rows)
+                    if not row:
+                        self.tess_status.config(text="NEA: selection cancelled.")
+                        return
+
+                    pl = row.get("pl_name")
+                    host = row.get("hostname")
+                    tic = row.get("tic_id")
+                    per = row.get("pl_orbper")          # days
+                    dur_hr = row.get("pl_trandur")      # hours
+                    trandep = row.get("pl_trandep")     # percent
+                    ratror = row.get("pl_ratror")       # Rp/Rs
+
+                    msg = f"NEA: {pl} | host={host} | TIC={tic} | P={per} d | dur={dur_hr} hr"
+                    self.tess_status.config(text=msg)
+
+                    # Auto-fill simulate tab (nice convenience)
+                    try:
+                        if per is not None:
+                            self.sim_period.set(str(float(per)))
+                        if dur_hr is not None:
+                            self.sim_duration.set(str(float(dur_hr) / 24.0))
+                        if trandep is not None:
+                            self.sim_depth.set(str(float(trandep) / 100.0))
+                        elif ratror is not None:
+                            self.sim_depth.set(str(float(ratror) ** 2))
+                    except Exception:
+                        pass
+
+                    # Auto-search TESS by TIC if available (usually best)
+                    if tic not in (None, "", "null"):
+                        self.tess_target.set(f"TIC {tic}")
+                        self.on_tess_search()
+                    else:
+                        # If no TIC, user can still click Search TESS on planet/host text
+                        pass
+
+                self.after(0, apply)
+
+            except Exception as e:
+                self.after(0, lambda: self.tess_status.config(text="NEA query failed."))
+                self.after(0, lambda: messagebox.showerror("NEA error", str(e)))
+
+        threading.Thread(target=work, daemon=True).start()
+
+    # -------- TESS search/download/analyze --------
     def on_tess_search(self):
         if not self._require_lightkurve():
             return
@@ -339,18 +446,18 @@ class TransitKitGUI(tk.Tk):
             return
 
         self.tess_list.delete(0, tk.END)
-        self.tess_status.config(text="Searching...")
+        self.tess_status.config(text="Searching TESS light curves...")
 
         def work():
             try:
                 kw = {}
                 if author != "Any":
                     kw["author"] = author
+
                 sr = lk.search_lightcurve(target, mission="TESS", **kw)
 
-                # Filter by cadence (exptime seconds), if requested
+                # Filter by cadence if exptime is present
                 if cadence is not None and len(sr) > 0:
-                    # sr.table has column 'exptime' in seconds in most cases
                     tbl = sr.table
                     if "exptime" in tbl.colnames:
                         mask = np.array(tbl["exptime"]) == cadence
@@ -363,15 +470,16 @@ class TransitKitGUI(tk.Tk):
                 self._sr = sr
                 self._sr_filtered = sr_f
 
-                # Populate list
                 for i, row in enumerate(sr_f.table):
+                    # Lightkurve commonly uses 'sequence_number' for sector
                     sector = row["sequence_number"] if "sequence_number" in row.colnames else row.get("sector", "NA")
                     exptime = row["exptime"] if "exptime" in row.colnames else "NA"
                     auth = row["author"] if "author" in row.colnames else author
-                    label = f"[{i:02d}] Sector {sector} | exptime={exptime}s | author={auth}"
+                    prod = row["productFilename"] if "productFilename" in row.colnames else ""
+                    label = f"[{i:02d}] Sector {sector} | exptime={exptime}s | author={auth} | {prod}"
                     self.tess_list.insert(tk.END, label)
 
-                msg = f"Found {len(sr_f)} light curve(s). Select one or more and click Download."
+                msg = f"Found {len(sr_f)} light curve(s). Select one or more, then Download."
                 self.after(0, lambda: self.tess_status.config(text=msg))
 
             except Exception as e:
@@ -387,8 +495,6 @@ class TransitKitGUI(tk.Tk):
             messagebox.showinfo("No results", "Search first, then select items to download.")
             return
 
-        import lightkurve as lk
-
         idxs = list(self.tess_list.curselection())
         if not idxs:
             messagebox.showinfo("No selection", "Select one or more light curves to download.")
@@ -399,22 +505,16 @@ class TransitKitGUI(tk.Tk):
         def work():
             try:
                 sr_sel = self._sr_filtered[idxs]
-                lcc = sr_sel.download_all()  # LightCurveCollection
+                lcc = sr_sel.download_all()
                 if lcc is None or len(lcc) == 0:
                     raise RuntimeError("Download returned no light curves.")
 
-                # Stitch and simple cleaning
-                lc = lcc.stitch()
+                lc = lcc.stitch().remove_nans()
 
-                # Drop NaNs
-                lc = lc.remove_nans()
-
-                # Save for analysis/export
                 self.tess_lc = lc
                 self.tess_time = np.array(lc.time.value, dtype=float)
                 self.tess_flux = np.array(lc.flux.value, dtype=float)
 
-                # Plot
                 def plot_now():
                     self.tess_plot.plot_xy(
                         self.tess_time,
@@ -426,7 +526,7 @@ class TransitKitGUI(tk.Tk):
                         alpha=0.6,
                         ms=2,
                     )
-                    self.tess_status.config(text=f"Downloaded & stitched {len(idxs)} sector(s). Ready for BLS/export.")
+                    self.tess_status.config(text=f"Downloaded & stitched {len(idxs)} item(s). Ready for BLS/export.")
 
                 self.after(0, plot_now)
 
@@ -441,7 +541,6 @@ class TransitKitGUI(tk.Tk):
             messagebox.showinfo("No data", "Download and stitch a light curve first.")
             return
 
-        # Sensible defaults for transit-like search on stitched data
         minP, maxP = 0.5, 20.0
 
         try:
@@ -492,11 +591,8 @@ class TransitKitGUI(tk.Tk):
         if not path:
             return
 
-        # Export as: time, flux
         arr = np.column_stack([self.tess_time, self.tess_flux])
-        header = "time_days,flux"
-
-        np.savetxt(path, arr, delimiter=",", header=header, comments="")
+        np.savetxt(path, arr, delimiter=",", header="time_days,flux", comments="")
         self.tess_status.config(text=f"Exported: {os.path.basename(path)}")
 
 

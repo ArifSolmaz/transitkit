@@ -1,2 +1,3 @@
 [console_scripts]
 transitkit = transitkit.cli:main
+transitkit-gui = transitkit.gui_app:main

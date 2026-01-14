@@ -2,6 +2,7 @@ README.md
 pyproject.toml
 src/transitkit/__init__.py
 src/transitkit/cli.py
+src/transitkit/gui_app.py
 src/transitkit/transit.py
 src/transitkit.egg-info/PKG-INFO
 src/transitkit.egg-info/SOURCES.txt
