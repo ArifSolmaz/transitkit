@@ -8,15 +8,16 @@ version = "0.1.0"
 description = "Exoplanet Transit Light Curve Analysis Toolkit"
 readme = "README.md"
 authors = [
-    {name = "Arif Solmaz", email = "arif.solmaz@gmail.com"}
+    { name = "Arif Solmaz", email = "arif.solmaz@gmail.com" }
 ]
-license = {text = "MIT"}
+license = { text = "MIT" }
 requires-python = ">=3.8"
 dependencies = [
     "numpy>=1.21.0",
     "matplotlib>=3.5.0",
     "scipy>=1.7.0",
     "astropy>=5.0.0",
+    "click>=8.1.0",
 ]
 
 [project.optional-dependencies]

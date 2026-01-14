@@ -14,12 +14,15 @@ def version():
     click.echo(f"TransitKit v{__version__}")
 
 @cli.command()
-@click.argument('target_id')
-@click.option('--mission', default='TESS', help='Mission name')
+@click.argument("target_id")
+@click.option("--mission", default="TESS", show_default=True, help="Mission name")
 def load(target_id, mission):
     """Load data for a target"""
     click.echo(f"Loading {target_id} from {mission}...")
     click.echo("(This is a placeholder - real loading coming soon!)")
 
-if __name__ == "__main__":
+def main():
     cli()
+
+if __name__ == "__main__":
+    main()
