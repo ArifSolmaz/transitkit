@@ -1243,7 +1243,8 @@ class TransitKitGUI(tk.Tk):
                  foreground="#666", font=("Segoe UI", 9)).pack(anchor="w", pady=(0, 8))
         
         # Add tooltips for fields
-        self._create_tooltip(self.tess_target, "Enter planet name, host star, or TIC ID")
+        self._create_tooltip(self.tess_target_entry, "Enter planet name, host star, or TIC ID")
+
         
         # Author selection
         ttk.Label(left, text="Author:").pack(anchor="w")
@@ -3230,29 +3231,67 @@ class TransitKitGUI(tk.Tk):
         self.log("Log viewer requested", "INFO")
     
     # ---------------- UTILITY METHODS ----------------
-    def _create_tooltip(self, widget, text):
-        """Create a tooltip for a widget"""
-        def enter(event):
-            x, y, _, _ = widget.bbox("insert")
-            x += widget.winfo_rootx() + 25
-            y += widget.winfo_rooty() + 25
-            
-            # Create toplevel window
-            self.tooltip = tk.Toplevel(widget)
-            self.tooltip.wm_overrideredirect(True)
-            self.tooltip.wm_geometry(f"+{x}+{y}")
-            
-            label = ttk.Label(self.tooltip, text=text, 
-                             background="#ffffe0", relief="solid", borderwidth=1,
-                             padding=5, font=("Segoe UI", 9))
-            label.pack()
-        
-        def leave(event):
-            if hasattr(self, 'tooltip'):
-                self.tooltip.destroy()
-        
-        widget.bind("<Enter>", enter)
-        widget.bind("<Leave>", leave)
+    def _create_tooltip(self, widget, text: str):
+        """
+        Safe tooltip helper.
+        - Expects a Tk widget (has .bind).
+        - If someone accidentally passes a tk.Variable (StringVar, IntVar, etc),
+        we just skip instead of crashing the entire app.
+        """
+        import tkinter as tk
+
+        # If the wrong object is passed (StringVar, etc.), do NOT crash the app
+        if widget is None or not hasattr(widget, "bind"):
+            try:
+                # if you have a logger panel method, use it
+                if hasattr(self, "_log"):
+                    self._log(f"[tooltip] skipped: expected widget, got {type(widget).__name__}")
+            except Exception:
+                pass
+            return
+
+        tip = {"win": None}
+
+        def show(_event=None):
+            if tip["win"] is not None:
+                return
+            try:
+                x = widget.winfo_rootx() + 20
+                y = widget.winfo_rooty() + widget.winfo_height() + 10
+            except Exception:
+                x, y = 100, 100
+
+            win = tk.Toplevel(widget)
+            win.wm_overrideredirect(True)
+            win.wm_geometry(f"+{x}+{y}")
+
+            lbl = tk.Label(
+                win,
+                text=text,
+                justify="left",
+                background="#ffffe0",
+                relief="solid",
+                borderwidth=1,
+                font=("Segoe UI", 9),
+                padx=6,
+                pady=3,
+            )
+            lbl.pack()
+            tip["win"] = win
+
+        def hide(_event=None):
+            win = tip.get("win")
+            if win is not None:
+                try:
+                    win.destroy()
+                except Exception:
+                    pass
+            tip["win"] = None
+
+        widget.bind("<Enter>", show)
+        widget.bind("<Leave>", hide)
+        widget.bind("<ButtonPress>", hide)
+
 
 
 # -------------------------

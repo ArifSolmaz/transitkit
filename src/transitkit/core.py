@@ -2,74 +2,125 @@
 """
 Core transit analysis functions with error propagation, MCMC support,
 and publication-quality algorithms.
+
+This module intentionally keeps computational kernels reasonably lightweight
+and robust to missing optional dependencies.
+
+Key fixes:
+- dataclass ordering bug fixed via kw_only=True (Python 3.10+)
+- optional parameters use safe defaults (None or tuples)
+- clearer errors for optional dependencies (batman-package)
 """
 
-import numpy as np
-import warnings
-from typing import Tuple, Dict, Optional, Union, List
-from dataclasses import dataclass
-from scipy import optimize, stats, signal
-from astropy import units as u
-from astropy.timeseries import BoxLeastSquares
-import emcee
-import corner
+from __future__ import annotations
 
-@dataclass
+import warnings
+from dataclasses import dataclass, field
+from typing import Dict, List, Optional, Tuple
+
+import numpy as np
+from scipy import stats
+from astropy.timeseries import BoxLeastSquares
+
+import emcee
+
+
+# =============================================================================
+# Data containers
+# =============================================================================
+
+@dataclass(kw_only=True)
 class TransitParameters:
-    """Container for transit parameters with uncertainties."""
+    """
+    Container for transit parameters with uncertainties.
+
+    NOTE:
+    - kw_only=True avoids dataclass positional-argument ordering constraints
+      (e.g., non-default after default), and is friendlier for future extensions.
+    """
+
+    # Required (core) parameters
     period: float
-    period_err: float = 0.0
     t0: float
-    t0_err: float = 0.0
     depth: float
-    depth_err: float = 0.0
     duration: float
+
+    # Uncertainties
+    period_err: float = 0.0
+    t0_err: float = 0.0
+    depth_err: float = 0.0
     duration_err: float = 0.0
-    b: float = 0.5  # Impact parameter
+
+    # Optional / derived parameters
+    b: float = 0.5  # impact parameter
     b_err: float = 0.0
-    rprs: float = None  # Planet-to-star radius ratio
+
+    rprs: Optional[float] = None  # Rp/R*
     rprs_err: float = 0.0
-    aRs: float = None  # Scaled semi-major axis
+
+    aRs: Optional[float] = None  # a/R*
     aRs_err: float = 0.0
+
     inclination: float = 90.0
     inclination_err: float = 0.0
-    limb_darkening: Tuple[float, float] = (0.1, 0.3)  # u1, u2
+
+    limb_darkening: Tuple[float, float] = (0.1, 0.3)  # (u1, u2)
+
+    # Detection diagnostics
     snr: float = 0.0
-    fap: float = 1.0  # False alarm probability
-    quality_flags: Dict = None
-    
-    def __post_init__(self):
-        if self.quality_flags is None:
+    fap: float = 1.0
+
+    # Quality flags
+    quality_flags: Dict[str, object] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        # Fill in defaults if empty
+        if not self.quality_flags:
             self.quality_flags = {
-                'bls_snr': self.snr > 7,
-                'duration_consistent': True,
-                'odd_even_consistent': True
+                "bls_snr": self.snr > 7,
+                "duration_consistent": True,
+                "odd_even_consistent": True,
             }
-    
-    def to_dict(self) -> Dict:
-        return {k: v for k, v in self.__dict__.items() 
-                if not k.startswith('_')}
-    
+
+        # Basic sanity checks (non-fatal, warn only)
+        if self.period <= 0:
+            warnings.warn("TransitParameters.period <= 0 is not physical.", RuntimeWarning)
+        if self.duration <= 0:
+            warnings.warn("TransitParameters.duration <= 0 is not physical.", RuntimeWarning)
+        if self.depth < 0:
+            warnings.warn("TransitParameters.depth < 0 is not physical.", RuntimeWarning)
+
+    def to_dict(self) -> Dict[str, object]:
+        return {k: v for k, v in self.__dict__.items() if not k.startswith("_")}
+
     @classmethod
-    def from_bls_result(cls, bls_result, time, flux, **kwargs):
-        """Create from BLS result with additional calculations."""
+    def from_bls_result(cls, bls_result, time, flux, **kwargs) -> "TransitParameters":
+        """
+        Create TransitParameters from an Astropy BLS result.
+
+        Expects attributes: period, transit_time, depth, duration (standard in BLS results).
+        """
         params = cls(
-            period=bls_result.period,
-            t0=bls_result.transit_time,
-            depth=bls_result.depth,
-            duration=bls_result.duration,
-            snr=getattr(bls_result, 'snr', 0),
-            **kwargs
+            period=float(bls_result.period),
+            t0=float(bls_result.transit_time),
+            depth=float(bls_result.depth),
+            duration=float(bls_result.duration),
+            snr=float(getattr(bls_result, "snr", 0.0) or 0.0),
+            **kwargs,
         )
-        
-        # Calculate additional parameters if possible
-        if hasattr(bls_result, 'depth_err'):
-            params.depth_err = bls_result.depth_err
-        if hasattr(bls_result, 'duration_err'):
-            params.duration_err = bls_result.duration_err
-            
+
+        # Optional errors if present
+        if hasattr(bls_result, "depth_err"):
+            params.depth_err = float(bls_result.depth_err)
+        if hasattr(bls_result, "duration_err"):
+            params.duration_err = float(bls_result.duration_err)
+
         return params
 
+
+# =============================================================================
+# Transit modeling
+# =============================================================================
 
 def generate_transit_signal_mandel_agol(
     time: np.ndarray,
@@ -83,60 +134,49 @@ def generate_transit_signal_mandel_agol(
     u1: float = 0.1,
     u2: float = 0.3,
     exptime: float = 0.0,
-    supersample: int = 7
+    supersample: int = 7,
 ) -> np.ndarray:
     """
-    Generate transit light curves using Mandel & Agol (2002) model.
-    
-    Parameters
-    ----------
-    time : array
-        Time array in days
-    period : float
-        Orbital period in days
-    t0 : float
-        Time of mid-transit in days
-    rprs : float
-        Planet-to-star radius ratio
-    aRs : float
-        Scaled semi-major axis (a/R_*)
-    inclination : float
-        Orbital inclination in degrees
-    eccentricity : float
-        Orbital eccentricity
-    omega : float
-        Argument of periastron in degrees
-    u1, u2 : float
-        Quadratic limb darkening coefficients
-    exptime : float
-        Exposure time for binning (days)
-    supersample : int
-        Supersampling factor for exposure time integration
-        
+    Generate transit light curves using Mandel & Agol (2002) model via batman-package.
+
     Returns
     -------
-    flux : array
-        Flux with transit signal
+    flux_model : np.ndarray
+        Model flux array (same shape as time).
     """
-    from batman import TransitParams, TransitModel
-    
+    time = np.asarray(time, dtype=float)
+
+    try:
+        from batman import TransitParams, TransitModel  # batman-package
+    except Exception as e:
+        raise ImportError(
+            "batman-package is required for Mandel & Agol model generation. "
+            "Install via: pip install batman-package"
+        ) from e
+
     params = TransitParams()
-    params.t0 = t0
-    params.per = period
-    params.rp = rprs
-    params.a = aRs
-    params.inc = inclination
-    params.ecc = eccentricity
-    params.w = omega
-    params.u = [u1, u2]  # Quadratic limb darkening
+    params.t0 = float(t0)
+    params.per = float(period)
+    params.rp = float(rprs)
+    params.a = float(aRs)
+    params.inc = float(inclination)
+    params.ecc = float(eccentricity)
+    params.w = float(omega)
+    params.u = [float(u1), float(u2)]
     params.limb_dark = "quadratic"
-    
-    # Create model
-    m = TransitModel(params, time, supersample_factor=supersample, 
-                     exp_time=exptime)
-    
+
+    m = TransitModel(
+        params,
+        time,
+        supersample_factor=int(max(1, supersample)),
+        exp_time=float(exptime),
+    )
     return m.light_curve(params)
 
+
+# =============================================================================
+# Period / transit search
+# =============================================================================
 
 def find_transits_multiple_methods(
     time: np.ndarray,
@@ -145,41 +185,33 @@ def find_transits_multiple_methods(
     min_period: float = 0.5,
     max_period: float = 100.0,
     n_periods: int = 10000,
-    methods: List[str] = ['bls', 'gls', 'pdm']
-) -> Dict:
+    methods: List[str] = None,
+) -> Dict[str, object]:
     """
     Find transits using multiple methods for robust detection.
-    
-    Returns consensus results with validation metrics.
+    Returns a dict with per-method outputs + consensus + validation.
     """
-    results = {}
-    
-    # BLS (primary method)
-    if 'bls' in methods:
-        bls_result = find_transits_bls_advanced(
+    if methods is None:
+        methods = ["bls", "gls", "pdm"]
+
+    results: Dict[str, object] = {}
+
+    if "bls" in methods:
+        results["bls"] = find_transits_bls_advanced(
             time, flux, flux_err, min_period, max_period, n_periods
         )
-        results['bls'] = bls_result
-        
-    # Generalized Lomb-Scargle
-    if 'gls' in methods:
-        gls_result = find_period_gls(time, flux, flux_err)
-        results['gls'] = gls_result
-        
-    # Phase Dispersion Minimization
-    if 'pdm' in methods:
-        pdm_result = find_period_pdm(time, flux)
-        results['pdm'] = pdm_result
-    
-    # Calculate consensus
+
+    if "gls" in methods:
+        results["gls"] = find_period_gls(time, flux, flux_err)
+
+    if "pdm" in methods:
+        results["pdm"] = find_period_pdm(time, flux)
+
     consensus = calculate_consensus(results)
-    results['consensus'] = consensus
-    
-    # Validation metrics
-    results['validation'] = validate_transit_detection(
-        time, flux, consensus, results
-    )
-    
+    results["consensus"] = consensus
+
+    results["validation"] = validate_transit_detection(time, flux, consensus, results)
+
     return results
 
 
@@ -191,377 +223,462 @@ def find_transits_bls_advanced(
     max_period: float = 100.0,
     n_periods: int = 10000,
     durations: Optional[np.ndarray] = None,
-    objective: str = 'likelihood'
-) -> Dict:
+    objective: str = "likelihood",
+) -> Dict[str, object]:
     """
-    Advanced BLS with likelihood optimization, FAP calculation,
-    and multiple hypothesis testing correction.
+    Advanced BLS with likelihood optimization, bootstrap FAP estimate,
+    and optional MCMC uncertainty estimation.
     """
     time = np.asarray(time, dtype=float)
     flux = np.asarray(flux, dtype=float)
-    
+
     if flux_err is None:
-        flux_err = np.ones_like(flux) * np.std(flux) / np.sqrt(len(flux))
-    
-    if durations is None:
-        # Log-spaced durations from 0.5 to 15 hours
-        durations = np.logspace(np.log10(0.5/24), np.log10(15/24), 15)
-    
-    # Log-spaced periods for better sensitivity
-    periods = np.logspace(np.log10(min_period), np.log10(max_period), n_periods)
-    
-    # Run BLS
-    bls = BoxLeastSquares(time, flux, dy=flux_err)
-    
-    if objective == 'likelihood':
-        # Use likelihood method
-        power = bls.power(periods, durations, objective='likelihood')
+        # Conservative default: scale by scatter / sqrt(N)
+        scatter = np.nanstd(flux)
+        flux_err = np.ones_like(flux, dtype=float) * (scatter / np.sqrt(max(len(flux), 1)))
     else:
-        power = bls.power(periods, durations, objective='snr')
-    
-    # Find best period
-    best_idx = np.nanargmax(power.power)
-    
-    # Calculate SNR
-    model = bls.model(time, power.period[best_idx], power.duration[best_idx],
-                      power.transit_time[best_idx])
+        flux_err = np.asarray(flux_err, dtype=float)
+
+    if durations is None:
+        # Log-spaced durations from 0.5 to 15 hours (days)
+        durations = np.logspace(np.log10(0.5 / 24.0), np.log10(15.0 / 24.0), 15)
+
+    periods = np.logspace(np.log10(min_period), np.log10(max_period), int(n_periods))
+
+    bls = BoxLeastSquares(time, flux, dy=flux_err)
+
+    obj = "likelihood" if objective == "likelihood" else "snr"
+    power = bls.power(periods, durations, objective=obj)
+
+    best_idx = int(np.nanargmax(power.power))
+
+    best_period = float(power.period[best_idx])
+    best_t0 = float(power.transit_time[best_idx])
+    best_duration = float(power.duration[best_idx])
+    best_depth = float(power.depth[best_idx])
+
+    model = bls.model(time, best_period, best_duration, best_t0)
     residuals = flux - model
-    rms = np.sqrt(np.mean(residuals**2))
-    snr = power.depth[best_idx] / rms * np.sqrt(len(time[model < 1]))
-    
-    # Calculate False Alarm Probability (Bootstrap method)
-    fap = calculate_fap_bootstrap(bls, time, flux, flux_err, 
-                                  power.period[best_idx], n_bootstrap=1000)
-    
-    # Calculate parameter uncertainties via MCMC
-    if snr > 5:  # Only run MCMC for good detections
-        samples, param_errors = estimate_parameters_mcmc(
-            time, flux, flux_err,
-            power.period[best_idx],
-            power.transit_time[best_idx],
-            power.duration[best_idx],
-            power.depth[best_idx]
+    rms = float(np.sqrt(np.nanmean(residuals**2)))
+
+    # SNR estimate: depth / rms * sqrt(N_in)
+    in_transit = model < 1.0
+    n_in = int(np.sum(in_transit))
+    snr = float((best_depth / max(rms, 1e-12)) * np.sqrt(max(n_in, 1)))
+
+    fap = float(
+        calculate_fap_bootstrap(
+            bls, time, flux, flux_err, best_period, n_bootstrap=500  # keep reasonable
+        )
+    )
+
+    if snr > 5:
+        _samples, param_errors = estimate_parameters_mcmc(
+            time, flux, flux_err, best_period, best_t0, best_duration, best_depth
         )
     else:
-        param_errors = {
-            'period_err': 0.0,
-            't0_err': 0.0,
-            'duration_err': 0.0,
-            'depth_err': 0.0
-        }
-    
-    # Create comprehensive result
-    result = {
-        'period': float(power.period[best_idx]),
-        't0': float(power.transit_time[best_idx]),
-        'duration': float(power.duration[best_idx]),
-        'depth': float(power.depth[best_idx]),
-        'snr': float(snr),
-        'fap': float(fap),
-        'power': float(power.power[best_idx]),
-        
-        # Full scans
-        'all_periods': power.period,
-        'all_powers': power.power,
-        'all_durations': power.duration,
-        
-        # Parameter uncertainties
-        'errors': param_errors,
-        
-        # Statistics
-        'residuals_rms': float(rms),
-        'chi2': float(np.sum((residuals/flux_err)**2)),
-        'bic': calculate_bic(time, flux, model, flux_err, n_params=4),
-        
-        # Metadata
-        'method': 'bls_advanced',
-        'objective': objective,
-        'n_data_points': len(time),
-        'data_span': float(time[-1] - time[0])
+        param_errors = {"period_err": 0.0, "t0_err": 0.0, "duration_err": 0.0, "depth_err": 0.0}
+
+    result: Dict[str, object] = {
+        "period": best_period,
+        "t0": best_t0,
+        "duration": best_duration,
+        "depth": best_depth,
+        "snr": snr,
+        "fap": fap,
+        "power": float(power.power[best_idx]),
+        "all_periods": power.period,
+        "all_powers": power.power,
+        "all_durations": power.duration,
+        "errors": param_errors,
+        "residuals_rms": rms,
+        "chi2": float(np.nansum(((residuals) / flux_err) ** 2)),
+        "bic": float(calculate_bic(time, flux, model, flux_err, n_params=4)),
+        "method": "bls_advanced",
+        "objective": obj,
+        "n_data_points": int(len(time)),
+        "data_span": float(time[-1] - time[0]) if len(time) > 1 else 0.0,
     }
-    
     return result
 
 
-def calculate_fap_bootstrap(bls, time, flux, flux_err, period, 
-                           n_bootstrap=1000, seed=42):
-    """Calculate FAP using bootstrap method."""
-    np.random.seed(seed)
-    max_powers = []
-    
-    # Generate bootstrap samples preserving time structure
-    for _ in range(n_bootstrap):
-        # Phase scrambling
-        phases = np.random.permutation(np.arange(len(flux)))
-        flux_bs = flux[phases]
-        
-        # Quick BLS on scrambled data
-        periods_test = np.linspace(period*0.9, period*1.1, 100)
-        durations_test = np.array([0.02, 0.05, 0.1])
-        
+def calculate_fap_bootstrap(
+    bls: BoxLeastSquares,
+    time: np.ndarray,
+    flux: np.ndarray,
+    flux_err: np.ndarray,
+    period: float,
+    n_bootstrap: int = 500,
+    seed: int = 42,
+) -> float:
+    """
+    Calculate FAP using a simple bootstrap / permutation scheme.
+
+    Notes
+    -----
+    This is a heuristic. For publication-grade FAP you may want:
+    - block bootstrap that preserves red noise
+    - bootstrap over residuals of a variability model
+    - injection-recovery simulations
+    """
+    rng = np.random.default_rng(seed)
+    max_powers: List[float] = []
+
+    periods_test = np.linspace(period * 0.9, period * 1.1, 150)
+    durations_test = np.array([0.02, 0.05, 0.1], dtype=float)
+
+    for _ in range(int(n_bootstrap)):
+        idx = rng.permutation(len(flux))
+        flux_bs = flux[idx]
+
         try:
-            power_bs = bls.power(periods_test, durations_test, 
-                                 objective='likelihood')
-            max_powers.append(np.max(power_bs.power))
-        except:
-            max_powers.append(0)
-    
-    # Calculate FAP from original power
-    original_power = bls.power([period], [0.05], objective='likelihood').power[0]
-    fap = np.sum(np.array(max_powers) >= original_power) / n_bootstrap
-    
-    return max(fap, 1e-10)  # Avoid zero
+            power_bs = bls.power(periods_test, durations_test, objective="likelihood")
+            max_powers.append(float(np.nanmax(power_bs.power)))
+        except Exception:
+            max_powers.append(0.0)
+
+    # Original power at the candidate period (use a representative duration)
+    try:
+        original_power = float(bls.power([period], [0.05], objective="likelihood").power[0])
+    except Exception:
+        original_power = 0.0
+
+    max_powers_arr = np.asarray(max_powers, dtype=float)
+    fap = float(np.sum(max_powers_arr >= original_power) / max(len(max_powers_arr), 1))
+    return max(fap, 1e-10)
 
 
-def estimate_parameters_mcmc(time, flux, flux_err, period_guess, 
-                            t0_guess, duration_guess, depth_guess,
-                            n_walkers=32, n_steps=2000, burnin=500):
+def estimate_parameters_mcmc(
+    time: np.ndarray,
+    flux: np.ndarray,
+    flux_err: np.ndarray,
+    period_guess: float,
+    t0_guess: float,
+    duration_guess: float,
+    depth_guess: float,
+    n_walkers: int = 32,
+    n_steps: int = 1500,
+    burnin: int = 400,
+) -> Tuple[np.ndarray, Dict[str, float]]:
     """
-    Estimate transit parameters and uncertainties using MCMC.
+    Estimate transit parameters and uncertainties using MCMC on a fast box model.
     """
+
+    time = np.asarray(time, dtype=float)
+    flux = np.asarray(flux, dtype=float)
+    flux_err = np.asarray(flux_err, dtype=float)
+
     def log_likelihood(theta, t, f, ferr):
-        """Gaussian likelihood."""
         period, t0, duration, depth = theta
-        
-        # Simple box model for speed
-        phase = ((t - t0) / period) % 1
+
+        # Box model
+        phase = ((t - t0) / period) % 1.0
         half_width = 0.5 * duration / period
-        in_transit = (phase < half_width) | (phase > 1 - half_width)
-        
+        in_tr = (phase < half_width) | (phase > 1.0 - half_width)
+
         model = np.ones_like(f)
-        model[in_transit] = 1 - depth
-        
-        # Chi-squared
-        chi2 = np.sum(((f - model) / ferr) ** 2)
+        model[in_tr] = 1.0 - depth
+
+        chi2 = np.nansum(((f - model) / ferr) ** 2)
         return -0.5 * chi2
-    
+
     def log_prior(theta):
-        """Uniform priors."""
         period, t0, duration, depth = theta
-        
-        if not (0.1 < period < 100):
+
+        if not (0.1 < period < 1000.0):
             return -np.inf
-        if not (time.min() < t0 < time.max()):
+        if not (np.nanmin(time) < t0 < np.nanmax(time)):
             return -np.inf
-        if not (0.001 < duration < 0.5):
+        if not (1e-4 < duration < 1.0):
             return -np.inf
-        if not (0.0001 < depth < 0.5):
+        if not (1e-6 < depth < 0.5):
             return -np.inf
-            
         return 0.0
-    
+
     def log_probability(theta, t, f, ferr):
         lp = log_prior(theta)
         if not np.isfinite(lp):
             return -np.inf
         return lp + log_likelihood(theta, t, f, ferr)
-    
-    # Initial guess
+
     ndim = 4
-    pos = np.array([period_guess, t0_guess, duration_guess, depth_guess])
-    pos = pos + 1e-4 * np.random.randn(n_walkers, ndim) * pos
-    
-    # Run MCMC
-    sampler = emcee.EnsembleSampler(
-        n_walkers, ndim, log_probability, 
-        args=(time, flux, flux_err)
-    )
-    sampler.run_mcmc(pos, n_steps, progress=False)
-    
-    # Process chains
-    samples = sampler.get_chain(discard=burnin, flat=True)
-    
-    # Calculate percentiles
-    percentiles = np.percentile(samples, [16, 50, 84], axis=0)
-    
-    # Errors as 68% confidence intervals
+    pos0 = np.array([period_guess, t0_guess, duration_guess, depth_guess], dtype=float)
+
+    # Small scatter around initial guess
+    scale = np.array([1e-4, 1e-4, 1e-4, 1e-4], dtype=float)
+    pos = pos0 + scale * np.random.randn(int(n_walkers), ndim) * np.maximum(np.abs(pos0), 1.0)
+
+    sampler = emcee.EnsembleSampler(int(n_walkers), ndim, log_probability, args=(time, flux, flux_err))
+    sampler.run_mcmc(pos, int(n_steps), progress=False)
+
+    samples = sampler.get_chain(discard=int(burnin), flat=True)
+
+    # Percentiles
+    p16, p50, p84 = np.percentile(samples, [16, 50, 84], axis=0)
+
     errors = {
-        'period_err': (percentiles[2,0] - percentiles[0,0]) / 2,
-        't0_err': (percentiles[2,1] - percentiles[0,1]) / 2,
-        'duration_err': (percentiles[2,2] - percentiles[0,2]) / 2,
-        'depth_err': (percentiles[2,3] - percentiles[0,3]) / 2,
+        "period_err": float((p84[0] - p16[0]) / 2.0),
+        "t0_err": float((p84[1] - p16[1]) / 2.0),
+        "duration_err": float((p84[2] - p16[2]) / 2.0),
+        "depth_err": float((p84[3] - p16[3]) / 2.0),
     }
-    
     return samples, errors
 
 
-def find_period_gls(time, flux, flux_err=None):
+def find_period_gls(time: np.ndarray, flux: np.ndarray, flux_err: Optional[np.ndarray] = None) -> Dict[str, object]:
     """Generalized Lomb-Scargle periodogram."""
     from astropy.timeseries import LombScargle
-    
+
+    time = np.asarray(time, dtype=float)
+    flux = np.asarray(flux, dtype=float)
+    if flux_err is not None:
+        flux_err = np.asarray(flux_err, dtype=float)
+
     ls = LombScargle(time, flux, dy=flux_err)
-    frequency, power = ls.autopower(minimum_frequency=1/100, 
-                                    maximum_frequency=1/0.5)
-    
-    best_idx = np.argmax(power)
-    period = 1/frequency[best_idx]
-    
-    # Calculate FAP
-    fap = ls.false_alarm_probability(power[best_idx])
-    
+    frequency, power = ls.autopower(minimum_frequency=1 / 100.0, maximum_frequency=1 / 0.5)
+
+    best_idx = int(np.nanargmax(power))
+    period = float(1.0 / frequency[best_idx])
+    fap = float(ls.false_alarm_probability(power[best_idx]))
+
     return {
-        'period': period,
-        'power': power[best_idx],
-        'fap': fap,
-        'frequencies': frequency,
-        'powers': power,
-        'method': 'gls'
+        "period": period,
+        "power": float(power[best_idx]),
+        "fap": fap,
+        "frequencies": frequency,
+        "powers": power,
+        "method": "gls",
     }
 
 
-def find_period_pdm(time, flux, nbins=10):
-    """Phase Dispersion Minimization."""
+def find_period_pdm(time: np.ndarray, flux: np.ndarray, nbins: int = 10) -> Dict[str, object]:
+    """Phase Dispersion Minimization (PDM)."""
     from astropy.stats import phase_dispersion
-    
-    periods = np.logspace(np.log10(0.5), np.log10(100), 1000)
-    theta = []
-    
-    for period in periods:
-        theta.append(phase_dispersion(time, flux, period, nbins=nbins))
-    
-    theta = np.array(theta)
-    best_period = periods[np.argmin(theta)]
-    
+
+    time = np.asarray(time, dtype=float)
+    flux = np.asarray(flux, dtype=float)
+
+    periods = np.logspace(np.log10(0.5), np.log10(100.0), 1000)
+    theta = np.array([phase_dispersion(time, flux, p, nbins=int(nbins)) for p in periods], dtype=float)
+    best_period = float(periods[int(np.nanargmin(theta))])
+
     return {
-        'period': best_period,
-        'theta': theta.min(),
-        'periods': periods,
-        'thetas': theta,
-        'method': 'pdm'
+        "period": best_period,
+        "theta": float(np.nanmin(theta)),
+        "periods": periods,
+        "thetas": theta,
+        "method": "pdm",
     }
 
 
-def calculate_consensus(results):
+def calculate_consensus(results: Dict[str, object]) -> Optional[Dict[str, object]]:
     """Calculate consensus from multiple period search methods."""
-    periods = []
-    weights = []
-    
+    periods: List[float] = []
+    weights: List[float] = []
+
     for method, result in results.items():
-        if method in ['bls', 'gls']:
-            if 'period' in result:
-                periods.append(result['period'])
-                # Weight by SNR or inverse FAP
-                if 'fap' in result and result['fap'] > 0:
-                    weights.append(-np.log10(result['fap']))
-                elif 'snr' in result:
-                    weights.append(result['snr'])
-                else:
-                    weights.append(1.0)
-    
-    if len(periods) == 0:
+        if method not in ("bls", "gls"):
+            continue
+        if not isinstance(result, dict):
+            continue
+        if "period" not in result:
+            continue
+
+        p = float(result["period"])
+        periods.append(p)
+
+        # Weight by -log10(FAP) when possible; else by SNR; else 1
+        if "fap" in result and result["fap"] is not None and float(result["fap"]) > 0:
+            weights.append(float(-np.log10(float(result["fap"]))))
+        elif "snr" in result and result["snr"] is not None:
+            weights.append(float(result["snr"]))
+        else:
+            weights.append(1.0)
+
+    if not periods:
         return None
-    
-    periods = np.array(periods)
-    weights = np.array(weights)
-    weights = weights / weights.sum()  # Normalize
-    
-    # Weighted average
-    consensus_period = np.average(periods, weights=weights)
-    
-    # Check for harmonics
-    harmonics = check_harmonics(periods, consensus_period)
-    
+
+    periods_arr = np.asarray(periods, dtype=float)
+    weights_arr = np.asarray(weights, dtype=float)
+    weights_arr = weights_arr / np.sum(weights_arr)
+
+    consensus_period = float(np.average(periods_arr, weights=weights_arr))
+    harmonics = check_harmonics(periods_arr, consensus_period)
+
     return {
-        'period': consensus_period,
-        'period_std': np.std(periods),
-        'method_agreement': len(periods),
-        'weights': weights.tolist(),
-        'individual_periods': periods.tolist(),
-        'harmonics_detected': harmonics,
-        'is_harmonic': harmonics['is_harmonic']
+        "period": consensus_period,
+        "period_std": float(np.std(periods_arr)),
+        "method_agreement": int(len(periods_arr)),
+        "weights": weights_arr.tolist(),
+        "individual_periods": periods_arr.tolist(),
+        "harmonics_detected": harmonics,
+        "is_harmonic": bool(harmonics.get("is_harmonic", False)),
     }
 
 
-def check_harmonics(periods, reference, tolerance=0.01):
-    """Check for harmonic relationships."""
-    harmonics = {}
-    
-    for p in periods:
-        ratio = p / reference
-        # Check common harmonics
-        for mult in [0.5, 2, 3, 1/3]:
+def check_harmonics(periods: np.ndarray, reference: float, tolerance: float = 0.01) -> Dict[str, object]:
+    """Check for common harmonic relationships relative to a reference period."""
+    harmonics: Dict[str, object] = {}
+
+    ref = float(reference)
+    for p in np.asarray(periods, dtype=float):
+        ratio = float(p / ref)
+        for mult in (0.5, 2.0, 3.0, 1.0 / 3.0):
             if abs(ratio - mult) < tolerance:
                 harmonics[str(mult)] = True
                 break
-    
-    harmonics['is_harmonic'] = len(harmonics) > 0
+
+    harmonics["is_harmonic"] = len([k for k in harmonics.keys() if k != "is_harmonic"]) > 0
     return harmonics
 
 
-def validate_transit_detection(time, flux, consensus, all_results):
+# =============================================================================
+# Validation
+# =============================================================================
+
+def validate_transit_detection(
+    time: np.ndarray,
+    flux: np.ndarray,
+    consensus: Optional[Dict[str, object]],
+    all_results: Dict[str, object],
+) -> Dict[str, object]:
     """Validate transit detection with multiple tests."""
-    validation = {}
-    
+    validation: Dict[str, object] = {}
+
     if consensus is None:
-        validation['passed'] = False
+        validation["passed"] = False
+        validation["reason"] = "no_consensus"
         return validation
-    
-    # Test 1: Odd-even transit consistency
-    validation['odd_even'] = check_odd_even_consistency(
-        time, flux, consensus['period'], 
-        all_results.get('bls', {}).get('t0', 0)
-    )
-    
-    # Test 2: Duration consistency
-    if 'bls' in all_results:
-        validation['duration_consistency'] = check_duration_consistency(
-            all_results['bls']['duration'], consensus['period']
+
+    period = float(consensus["period"])
+    t0 = float(all_results.get("bls", {}).get("t0", time[0] if len(time) else 0.0))
+
+    validation["odd_even"] = check_odd_even_consistency(time, flux, period, t0)
+
+    if "bls" in all_results and isinstance(all_results["bls"], dict) and "duration" in all_results["bls"]:
+        validation["duration_consistency"] = check_duration_consistency(
+            float(all_results["bls"]["duration"]), period
         )
-    
-    # Test 3: Secondary eclipse check
-    validation['secondary'] = check_secondary_eclipse(
-        time, flux, consensus['period'], 
-        all_results.get('bls', {}).get('t0', 0)
+    else:
+        validation["duration_consistency"] = True  # can't test
+
+    validation["secondary"] = check_secondary_eclipse(time, flux, period, t0)
+    validation["variability"] = check_stellar_variability(time, flux)
+
+    validation["passed"] = (
+        float(validation.get("odd_even", {}).get("p_value", 0.0)) > 0.01
+        and bool(validation.get("duration_consistency", True))
+        and bool(validation.get("secondary", {}).get("detected", False)) is False
     )
-    
-    # Test 4: Stellar variability contamination
-    validation['variability'] = check_stellar_variability(time, flux)
-    
-    # Overall validation
-    validation['passed'] = (
-        validation.get('odd_even', {}).get('p_value', 0) > 0.01 and
-        validation.get('duration_consistency', True) and
-        validation.get('secondary', {}).get('detected', False) == False
-    )
-    
+
     return validation
 
 
-def check_odd_even_consistency(time, flux, period, t0):
+def check_odd_even_consistency(time: np.ndarray, flux: np.ndarray, period: float, t0: float) -> Dict[str, object]:
     """Check if odd and even transits are consistent."""
-    phase = ((time - t0) / period) % 1
-    
-    # Separate odd and even transits
+    time = np.asarray(time, dtype=float)
+    flux = np.asarray(flux, dtype=float)
+
+    phase = ((time - t0) / period) % 1.0
     transit_number = np.floor((time - t0) / period + 0.5).astype(int)
-    is_even = transit_number % 2 == 0
-    
-    # Extract in-transit points
+    is_even = (transit_number % 2) == 0
+
+    # Simple in-transit window around phase 0
     in_transit = (phase < 0.05) | (phase > 0.95)
-    
-    if np.sum(in_transit & is_even) < 10 or np.sum(in_transit & ~is_even) < 10:
-        return {'p_value': 1.0, 'conclusion': 'insufficient_data'}
-    
+
+    n_even = int(np.sum(in_transit & is_even))
+    n_odd = int(np.sum(in_transit & ~is_even))
+    if n_even < 10 or n_odd < 10:
+        return {"p_value": 1.0, "conclusion": "insufficient_data", "n_even": n_even, "n_odd": n_odd}
+
     flux_even = flux[in_transit & is_even]
     flux_odd = flux[in_transit & ~is_even]
-    
-    # T-test for difference
-    t_stat, p_value = stats.ttest_ind(flux_even, flux_odd, 
-                                      equal_var=False, nan_policy='omit')
-    
+
+    t_stat, p_value = stats.ttest_ind(flux_even, flux_odd, equal_var=False, nan_policy="omit")
+
     return {
-        't_statistic': t_stat,
-        'p_value': p_value,
-        'n_even': len(flux_even),
-        'n_odd': len(flux_odd),
-        'mean_even': np.nanmean(flux_even),
-        'mean_odd': np.nanmean(flux_odd),
-        'conclusion': 'consistent' if p_value > 0.01 else 'inconsistent'
+        "t_statistic": float(t_stat) if np.isfinite(t_stat) else float("nan"),
+        "p_value": float(p_value) if np.isfinite(p_value) else 1.0,
+        "n_even": int(len(flux_even)),
+        "n_odd": int(len(flux_odd)),
+        "mean_even": float(np.nanmean(flux_even)),
+        "mean_odd": float(np.nanmean(flux_odd)),
+        "conclusion": "consistent" if (np.isfinite(p_value) and p_value > 0.01) else "inconsistent",
     }
 
 
-def calculate_bic(time, flux, model, flux_err, n_params):
-    """Calculate Bayesian Information Criterion."""
-    n = len(time)
-    chi2 = np.sum(((flux - model) / flux_err) ** 2)
-    bic = chi2 + n_params * np.log(n)
-    return bic
+def check_duration_consistency(duration: float, period: float) -> bool:
+    """
+    Very basic duration sanity check.
+    Transit duration must be < period and not absurdly tiny.
+    """
+    if duration <= 0:
+        return False
+    if duration >= period:
+        return False
+    if duration < (1.0 / 24.0 / 60.0):  # < 1 minute in days
+        return False
+    return True
+
+
+def check_secondary_eclipse(time: np.ndarray, flux: np.ndarray, period: float, t0: float) -> Dict[str, object]:
+    """
+    Simple secondary eclipse heuristic:
+    check for a dip near phase 0.5 compared to out-of-eclipse baseline.
+
+    This is intentionally conservative and fast.
+    """
+    time = np.asarray(time, dtype=float)
+    flux = np.asarray(flux, dtype=float)
+
+    phase = ((time - t0) / period) % 1.0
+
+    # windows
+    win_primary = (phase < 0.05) | (phase > 0.95)
+    win_secondary = (np.abs(phase - 0.5) < 0.05)
+    win_out = (np.abs(phase - 0.25) < 0.05) | (np.abs(phase - 0.75) < 0.05)
+
+    if np.sum(win_secondary) < 10 or np.sum(win_out) < 10:
+        return {"detected": False, "reason": "insufficient_data"}
+
+    sec_depth = float(np.nanmedian(flux[win_out]) - np.nanmedian(flux[win_secondary]))
+    # crude significance using MAD
+    mad = float(np.nanmedian(np.abs(flux[win_out] - np.nanmedian(flux[win_out]))))
+    sigma = 1.4826 * mad if mad > 0 else float(np.nanstd(flux[win_out]))
+    snr = sec_depth / max(sigma, 1e-12)
+
+    detected = bool(snr > 5.0 and sec_depth > 0)
+    return {"detected": detected, "secondary_depth": sec_depth, "secondary_snr": float(snr)}
+
+
+def check_stellar_variability(time: np.ndarray, flux: np.ndarray) -> Dict[str, object]:
+    """
+    Quick variability diagnostic: robust scatter and a crude autocorrelation proxy.
+    """
+    time = np.asarray(time, dtype=float)
+    flux = np.asarray(flux, dtype=float)
+
+    med = float(np.nanmedian(flux))
+    mad = float(np.nanmedian(np.abs(flux - med)))
+    robust_std = float(1.4826 * mad)
+
+    return {"robust_std": robust_std, "median_flux": med}
+
+
+# =============================================================================
+# Information criteria
+# =============================================================================
+
+def calculate_bic(time: np.ndarray, flux: np.ndarray, model: np.ndarray, flux_err: np.ndarray, n_params: int) -> float:
+    """Bayesian Information Criterion."""
+    time = np.asarray(time, dtype=float)
+    flux = np.asarray(flux, dtype=float)
+    model = np.asarray(model, dtype=float)
+    flux_err = np.asarray(flux_err, dtype=float)
+
+    n = int(len(time))
+    if n <= 0:
+        return float("nan")
+
+    chi2 = float(np.nansum(((flux - model) / flux_err) ** 2))
+    return float(chi2 + int(n_params) * np.log(n))

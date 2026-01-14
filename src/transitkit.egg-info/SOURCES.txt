@@ -1,6 +1,7 @@
 README.md
 pyproject.toml
 src/transitkit/__init__.py
+src/transitkit/__main__.py
 src/transitkit/analysis.py
 src/transitkit/cli.py
 src/transitkit/core.py
