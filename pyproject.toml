@@ -10,11 +10,12 @@ readme = "README.md"
 authors = [
     {name = "Arif Solmaz", email = "arif.solmaz@gmail.com"}
 ]
-license = {file = "LICENSE"}
+license = "MIT"  # CHANGED: Simple SPDX string instead of table
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Astronomy",
+    # REMOVED: License classifier - it's deprecated
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
@@ -90,8 +91,11 @@ transitkit-gui = "transitkit.frontend.desktop:main"
 [project.entry-points."transitkit.plugins"]
 example = "transitkit.plugins.example:ExamplePlugin"
 
+# FIX FOR MISSING PACKAGE DIRECTORY:
+# Update the tool.setuptools section to point to the correct location
 [tool.setuptools]
-packages = ["transitkit"]
+# If your package is in src/transitkit:
+packages.find = {where = ["src"]}
 include-package-data = true
 
 [tool.setuptools.package-data]
