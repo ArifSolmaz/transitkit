@@ -93,6 +93,12 @@ test = [
     "hypothesis>=6.85.0",
 ]
 
+io = [
+  "h5py>=3.9.0",
+  "tables>=3.8.0",
+  "pyarrow>=14.0.0",
+]
+
 # Development tools
 dev = [
     "black>=23.9.0",
