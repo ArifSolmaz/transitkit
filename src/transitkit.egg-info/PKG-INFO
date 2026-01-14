@@ -11,6 +11,7 @@ Requires-Dist: numpy>=1.21.0
 Requires-Dist: matplotlib>=3.5.0
 Requires-Dist: scipy>=1.7.0
 Requires-Dist: astropy>=5.0.0
+Requires-Dist: click>=8.1.0
 Provides-Extra: test
 Requires-Dist: pytest>=7.0.0; extra == "test"
 Requires-Dist: pytest-cov>=4.0.0; extra == "test"
