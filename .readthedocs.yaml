@@ -15,16 +15,10 @@ sphinx:
   configuration: docs/conf.py
 
 # Optional but recommended - specify format outputs
+# Remove 'html' - it's the default and not a valid option
 formats:
-  - html
   - pdf
   - epub
-
-# Optional - enable PDF/EPUB generation
-build:
-  os: ubuntu-24.04
-  tools:
-    python: "3.11"
 
 # Install Python dependencies for building documentation
 python:
@@ -33,10 +27,6 @@ python:
       path: .
       extra_requirements:
         - docs
-
-# Optional: Configure conda environment
-# conda:
-#   environment: docs/environment.yml
 
 # Optional: Submodules
 submodules:
