@@ -4,8 +4,8 @@ import sys
 sys.path.insert(0, os.path.abspath('..'))
 
 project = 'TransitKit'
-copyright = '2024, YOUR NAME'
-author = 'YOUR NAME'
+copyright = '2024, Arif Solmaz'
+author = 'Arif Solmaz'
 
 extensions = [
     'myst_parser',

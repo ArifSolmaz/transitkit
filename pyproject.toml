@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "Exoplanet Transit Light Curve Analysis Toolkit"
 readme = "README.md"
 authors = [
-    {name = "YOUR NAME", email = "YOUR-EMAIL@gmail.com"}
+    {name = "Arif Solmaz", email = "arif.solmaz@gmail.com"}
 ]
 license = {text = "MIT"}
 requires-python = ">=3.8"
@@ -35,7 +35,7 @@ docs = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/YOUR-USERNAME/transitkit"
+Homepage = "https://github.com/arifsolmaz/transitkit"
 
 [project.scripts]
 transitkit = "transitkit.cli:main"

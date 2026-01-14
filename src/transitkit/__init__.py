@@ -1,8 +1,8 @@
 """TransitKit: Exoplanet Transit Light Curve Analysis Toolkit"""
 
 __version__ = "0.1.0"
-__author__ = "YOUR NAME"
-__email__ = "YOUR-EMAIL@gmail.com"
+__author__ = "Arif Solmaz"
+__email__ = "arif.solmaz@gmail.com"
 
 # Export main functions
 from .transit import (
