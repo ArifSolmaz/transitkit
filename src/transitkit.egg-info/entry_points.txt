@@ -1,0 +1,2 @@
+[console_scripts]
+transitkit = transitkit.cli:main

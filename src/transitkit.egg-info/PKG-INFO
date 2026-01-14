@@ -1,0 +1,36 @@
+Metadata-Version: 2.4
+Name: transitkit
+Version: 0.1.0
+Summary: Exoplanet Transit Light Curve Analysis Toolkit
+Author-email: Arif Solmaz <arif.solmaz@gmail.com>
+License: MIT
+Project-URL: Homepage, https://github.com/arifsolmaz/transitkit
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.21.0
+Requires-Dist: matplotlib>=3.5.0
+Requires-Dist: scipy>=1.7.0
+Requires-Dist: astropy>=5.0.0
+Provides-Extra: test
+Requires-Dist: pytest>=7.0.0; extra == "test"
+Requires-Dist: pytest-cov>=4.0.0; extra == "test"
+Provides-Extra: dev
+Requires-Dist: black>=23.0.0; extra == "dev"
+Requires-Dist: flake8>=6.0.0; extra == "dev"
+Provides-Extra: docs
+Requires-Dist: sphinx>=7.0.0; extra == "docs"
+Requires-Dist: sphinx-rtd-theme>=1.3.0; extra == "docs"
+Requires-Dist: myst-parser>=2.0.0; extra == "docs"
+
+# TransitKit 🪐
+
+[![Python Version](https://img.shields.io/badge/python-3.8%2B-blue)](https://www.python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://github.com/arifsolmaz/transitkit/actions/workflows/test.yml/badge.svg)](https://github.com/arifsolmaz/transitkit/actions/workflows/test.yml)
+
+**Exoplanet Transit Light Curve Analysis Toolkit**
+
+## 📦 Installation
+
+```bash
+pip install git+https://github.com/arifsolmaz/transitkit.git
