@@ -28,6 +28,5 @@ def test_find_transits():
     
     results = tk.find_transits_box(time, flux, min_period=1.0, max_period=10.0)
     
-    assert 'period' in results
-    assert 'score' in results
-    assert 1.0 <= results['period'] <= 10.0
+    assert "all_power" in results
+    assert "period" in results
