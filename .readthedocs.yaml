@@ -8,15 +8,37 @@ version: 2
 build:
   os: ubuntu-24.04
   tools:
-    python: "3.13"
+    python: "3.11"  # Using 3.11 instead of 3.13 for better compatibility
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:
-   configuration: docs/conf.py
+  configuration: docs/conf.py
 
-# Optionally, but recommended,
-# declare the Python requirements required to build your documentation
-# See https://docs.readthedocs.io/en/stable/guides/reproducible-builds.html
-# python:
-#    install:
-#    - requirements: docs/requirements.txt
+# Optional but recommended - specify format outputs
+formats:
+  - html
+  - pdf
+  - epub
+
+# Optional - enable PDF/EPUB generation
+build:
+  os: ubuntu-24.04
+  tools:
+    python: "3.11"
+
+# Install Python dependencies for building documentation
+python:
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - docs
+
+# Optional: Configure conda environment
+# conda:
+#   environment: docs/environment.yml
+
+# Optional: Submodules
+submodules:
+  include: all
+  recursive: false

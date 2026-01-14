@@ -1,0 +1,18 @@
+/* Custom styles for TransitKit documentation */
+
+/* Make code blocks stand out */
+.highlight {
+    border-radius: 5px;
+    border: 1px solid #e1e4e8;
+}
+
+/* Better spacing for paragraphs */
+p {
+    line-height: 1.6;
+}
+
+/* Style for note boxes */
+.admonition.note {
+    border-left: 4px solid #2980b9;
+    background-color: #ebf5fb;
+}
