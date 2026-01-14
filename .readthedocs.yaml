@@ -6,16 +6,16 @@ version: 2
 
 # Set the OS, Python version, and other tools you might need
 build:
-  os: ubuntu-24.04
+  os: ubuntu-24.04  # Using newer Ubuntu for better package availability
   tools:
     python: "3.11"  # Using 3.11 instead of 3.13 for better compatibility
 
 # Build documentation in the "docs/" directory with Sphinx
 sphinx:
   configuration: docs/conf.py
+  fail_on_warning: true  # Fail on warnings to ensure documentation quality
 
 # Optional but recommended - specify format outputs
-# Remove 'html' - it's the default and not a valid option
 formats:
   - pdf
   - epub
@@ -27,8 +27,13 @@ python:
       path: .
       extra_requirements:
         - docs
+        - examples  # Include examples for documentation
+
+# Use Conda environment if specified, otherwise use pip
+conda:
+  environment: environment.yml  # Optional Conda environment
 
 # Optional: Submodules
 submodules:
   include: all
-  recursive: false
+  recursive: true  # Include all submodules recursively

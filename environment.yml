@@ -1,0 +1,26 @@
+name: transitkit
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.10
+  - numpy
+  - scipy
+  - astropy
+  - pandas
+  - matplotlib
+  - plotly
+  - bokeh
+  - lightkurve
+  - batman-package
+  - emcee
+  - dynesty
+  - celerite2
+  - jax
+  - jaxlib
+  - pip
+  - pip:
+    - exoplanet
+    - streamlit
+    - fastapi
+    - uvicorn[standard]

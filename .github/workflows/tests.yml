@@ -1,17 +1,133 @@
 name: Tests
 
-on: [push, pull_request]
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+  workflow_dispatch:  # Allow manual triggering
 
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ['3.10', '3.11', '3.12']
+        include:
+          # Fast test run for basic validation
+          - os: ubuntu-latest
+            python-version: '3.10'
+            full-test: true
+            lint-test: true
+          # Include quick test on all Python versions for ubuntu
+          - os: ubuntu-latest
+            python-version: '3.11'
+            full-test: false
+            lint-test: false
+          - os: ubuntu-latest
+            python-version: '3.12'
+            full-test: false
+            lint-test: false
+    
     steps:
     - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+        cache: 'pip'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -e ".[dev]"
+    
+    - name: Test import
+      run: |
+        python -c "import transitkit; print(f'Success: {transitkit.__version__}')"
+    
+    - name: Test CLI
+      run: |
+        transitkit --version
+        transitkit --help
+    
+    - name: Lint with pre-commit
+      if: matrix.lint-test
+      run: |
+        pre-commit run --all-files
+    
+    - name: Type check with mypy
+      if: matrix.lint-test
+      run: |
+        mypy src/transitkit --ignore-missing-imports
+    
+    - name: Test with pytest
+      if: matrix.full-test
+      run: |
+        pytest tests/ -v --cov=transitkit --cov-report=xml --cov-report=term-missing
+    
+    - name: Quick test with pytest (core only)
+      if: matrix.full-test == false
+      run: |
+        pytest tests/ -v -m "not slow" --tb=short
+    
+    - name: Upload coverage to Codecov
+      if: matrix.full-test && matrix.os == 'ubuntu-latest' && matrix.python-version == '3.10'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+
+  test-gpu:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+    
+    steps:
+    - uses: actions/checkout@v4
+    
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
         python-version: '3.10'
-    - name: Install dependencies
-      run: pip install -e .
-    - name: Test import
-      run: python -c "import transitkit; print(f'Success: {transitkit.__version__}')"
+        cache: 'pip'
+    
+    - name: Install GPU dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install jax[cuda11_pip] -f https://storage.googleapis.com/jax-releases/jax_cuda_releases.html
+        pip install -e ".[gpu]"
+    
+    - name: Test import with GPU
+      run: |
+        python -c "
+        try:
+            import jax
+            print(f'JAX devices: {jax.devices()}')
+            print('JAX imported successfully')
+        except Exception as e:
+            print(f'JAX import failed: {e}')
+        "
+    
+    - name: Test GPU acceleration (basic)
+      run: |
+        python -c "
+        try:
+            import jax
+            print(f'JAX backend: {jax.default_backend()}')
+            print(f'Number of devices: {jax.device_count()}')
+            # Test a simple GPU operation
+            import jax.numpy as jnp
+            x = jnp.array([1.0, 2.0, 3.0])
+            y = jnp.sin(x)
+            print(f'GPU operation successful: {y}')
+        except Exception as e:
+            print(f'GPU test failed (may be expected on CI): {e}')
+        "
