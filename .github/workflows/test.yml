@@ -1,36 +1,42 @@
 name: Tests
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
 
 jobs:
   test:
     runs-on: ubuntu-latest
-    
+
     strategy:
+      fail-fast: false
       matrix:
-        python-version: ["3.8", "3.9", "3.10", "3.11"]
-    
+        # TransitKit declares requires-python = ">=3.9"
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
-      with:
-        python-version: ${{ matrix.python-version }}
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -e .[test]
-    
-    - name: Run tests
-      run: |
-        pytest tests/ -v
-    
-    - name: Test import
-      run: |
-        python -c "import transitkit; print(f'Success: {transitkit.__version__}')"
-    
-    - name: Test CLI
-      run: |
-        transitkit version
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e ".[test]"
+
+      - name: Run tests
+        run: |
+          pytest -q
+
+      - name: Test import
+        run: |
+          python -c "import transitkit; print(f'Success: {transitkit.__version__}')"
+
+      - name: Test CLI
+        run: |
+          transitkit --help
+          transitkit version
