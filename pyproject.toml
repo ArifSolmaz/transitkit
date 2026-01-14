@@ -25,6 +25,12 @@ test = [
     "pytest>=7.0.0",
     "pytest-cov>=4.0.0",
 ]
+
+tess = [
+    "lightkurve>=2.4.0",
+    "pandas>=2.0.0",
+]
+
 dev = [
     "black>=23.0.0",
     "flake8>=6.0.0",
@@ -40,3 +46,4 @@ Homepage = "https://github.com/arifsolmaz/transitkit"
 
 [project.scripts]
 transitkit = "transitkit.cli:main"
+transitkit-gui = "transitkit.gui_app:main"
