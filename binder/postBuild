@@ -1,9 +1,0 @@
-#!/bin/bash
-# Install TransitKit in development mode
-pip install -e .
-
-# Copy examples
-cp -r examples /home/jovyan/
-
-# Set up Jupyter extensions
-jupyter labextension install @jupyter-widgets/jupyterlab-manager
