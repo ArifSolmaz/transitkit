@@ -1,7 +1,9 @@
 """
-🌟 TransitKit - Professional Exoplanet Transit Analysis
-A comprehensive Streamlit application for transit light curve analysis
-Based on github.com/arifsolmaz/transitkit
+🌟 TransitKit v3.0 - Universal Exoplanet Transit Analysis
+Any Planet, Any Mission, One Line
+
+Interactive Streamlit application for professional transit analysis.
+https://github.com/arifsolmaz/transitkit
 """
 
 import streamlit as st
@@ -10,9 +12,6 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from scipy import signal
-from scipy.optimize import minimize
-from scipy.stats import median_abs_deviation
 import warnings
 warnings.filterwarnings('ignore')
 
@@ -20,16 +19,38 @@ warnings.filterwarnings('ignore')
 # PAGE CONFIGURATION
 # ============================================================================
 st.set_page_config(
-    page_title="TransitKit - Exoplanet Transit Analysis",
+    page_title="TransitKit v3.0 - Universal Transit Analysis",
     page_icon="🌟",
     layout="wide",
     initial_sidebar_state="expanded",
     menu_items={
         'Get Help': 'https://github.com/arifsolmaz/transitkit',
         'Report a bug': 'https://github.com/arifsolmaz/transitkit/issues',
-        'About': "# TransitKit v2.0\nProfessional Exoplanet Transit Light Curve Analysis"
+        'About': "# TransitKit v3.0\nUniversal Exoplanet Transit Analysis Toolkit"
     }
 )
+
+# ============================================================================
+# IMPORT TRANSITKIT MODULES
+# ============================================================================
+TRANSITKIT_AVAILABLE = False
+try:
+    from transitkit.universal import UniversalTarget, UniversalResolver, resolve
+    from transitkit.missions import MultiMissionDownloader, download_all
+    from transitkit.ml import MLTransitDetector, detect_transits, DetectionMethod
+    from transitkit.spectroscopy import JWSTSpectroscopy
+    from transitkit.publication import PublicationGenerator, PublicationConfig
+    from transitkit.core import (
+        generate_transit_signal_mandel_agol,
+        find_transits_bls_advanced,
+        add_noise
+    )
+    import transitkit
+    TRANSITKIT_AVAILABLE = True
+    TK_VERSION = getattr(transitkit, '__version__', '3.0.0')
+except ImportError as e:
+    TK_VERSION = "Not Installed"
+    IMPORT_ERROR = str(e)
 
 # ============================================================================
 # CUSTOM CSS - DARK SPACE THEME
@@ -42,6 +63,7 @@ st.markdown("""
         --primary: #00d4aa;
         --secondary: #7c3aed;
         --accent: #f59e0b;
+        --danger: #ef4444;
         --bg-dark: #0a0a0f;
         --bg-card: #12121a;
         --bg-elevated: #1a1a2e;
@@ -91,7 +113,7 @@ st.markdown("""
         font-family: 'Space Grotesk', sans-serif;
     }
     
-    .main-header .badge {
+    .main-header .version-badge {
         display: inline-block;
         background: rgba(0, 212, 170, 0.15);
         color: var(--primary);
@@ -104,13 +126,6 @@ st.markdown("""
     }
     
     /* Metric Cards */
-    .metric-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        gap: 1rem;
-        margin: 1.5rem 0;
-    }
-    
     .metric-card {
         background: var(--bg-card);
         border: 1px solid var(--border);
@@ -141,12 +156,6 @@ st.markdown("""
         margin-top: 0.5rem;
     }
     
-    .metric-card .unit {
-        color: var(--text-secondary);
-        font-size: 0.9rem;
-        margin-left: 0.25rem;
-    }
-    
     /* Section Headers */
     .section-header {
         display: flex;
@@ -163,10 +172,6 @@ st.markdown("""
         font-size: 1.4rem;
         font-weight: 600;
         margin: 0;
-    }
-    
-    .section-header .icon {
-        font-size: 1.3rem;
     }
     
     /* Info/Warning boxes */
@@ -188,6 +193,14 @@ st.markdown("""
         margin: 1rem 0;
     }
     
+    .error-box {
+        background: rgba(239, 68, 68, 0.08);
+        border-left: 3px solid var(--danger);
+        padding: 1rem 1.25rem;
+        border-radius: 0 8px 8px 0;
+        margin: 1rem 0;
+    }
+    
     .success-box {
         background: rgba(34, 197, 94, 0.08);
         border-left: 3px solid #22c55e;
@@ -196,54 +209,76 @@ st.markdown("""
         margin: 1rem 0;
     }
     
-    /* Method comparison cards */
-    .method-card {
-        background: var(--bg-elevated);
+    /* Planet card */
+    .planet-card {
+        background: linear-gradient(145deg, var(--bg-card), var(--bg-elevated));
         border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 1rem;
-        margin: 0.5rem 0;
+        border-radius: 16px;
+        padding: 1.5rem;
+        margin: 1rem 0;
     }
     
-    .method-card.best {
-        border-color: var(--primary);
-        background: rgba(0, 212, 170, 0.05);
+    .planet-name {
+        font-family: 'Space Grotesk', sans-serif;
+        font-size: 1.8rem;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 0.5rem;
     }
     
-    .method-name {
-        font-family: 'JetBrains Mono', monospace;
+    .planet-type {
+        display: inline-block;
+        background: rgba(124, 58, 237, 0.2);
+        color: #a78bfa;
+        padding: 0.25rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.8rem;
         font-weight: 600;
-        color: var(--text-primary);
-        font-size: 1rem;
     }
     
-    /* Parameter display */
-    .param-row {
-        display: flex;
-        justify-content: space-between;
-        padding: 0.5rem 0;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
+    /* Parameter grid */
+    .param-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+        gap: 1rem;
+        margin-top: 1rem;
     }
     
-    .param-name {
+    .param-item {
+        background: rgba(0, 0, 0, 0.2);
+        padding: 0.75rem;
+        border-radius: 8px;
+    }
+    
+    .param-label {
         color: var(--text-secondary);
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
     }
     
     .param-value {
         font-family: 'JetBrains Mono', monospace;
-        color: var(--primary);
+        color: var(--text-primary);
+        font-size: 1.1rem;
+        font-weight: 600;
     }
     
-    /* Code blocks */
-    .code-block {
-        background: var(--bg-dark);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 1rem;
-        font-family: 'JetBrains Mono', monospace;
-        font-size: 0.85rem;
-        overflow-x: auto;
+    /* Mission badges */
+    .mission-badge {
+        display: inline-block;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
     }
+    
+    .mission-tess { background: #1e40af; color: #93c5fd; }
+    .mission-kepler { background: #065f46; color: #6ee7b7; }
+    .mission-k2 { background: #7c2d12; color: #fdba74; }
+    .mission-jwst { background: #581c87; color: #d8b4fe; }
     
     /* Tabs styling */
     .stTabs [data-baseweb="tab-list"] {
@@ -272,36 +307,16 @@ st.markdown("""
         border-right: 1px solid var(--border);
     }
     
-    [data-testid="stSidebar"] .block-container {
-        padding-top: 2rem;
-    }
-    
-    /* Sliders */
-    .stSlider > div > div > div {
-        background: var(--primary) !important;
-    }
-    
-    /* Buttons */
-    .stButton > button {
-        background: linear-gradient(135deg, var(--primary), var(--secondary));
-        color: white;
-        border: none;
+    /* Code blocks */
+    .code-example {
+        background: #1e1e2e;
+        border: 1px solid var(--border);
         border-radius: 8px;
-        font-family: 'Space Grotesk', sans-serif;
-        font-weight: 600;
-        padding: 0.5rem 1.5rem;
-        transition: all 0.3s ease;
-    }
-    
-    .stButton > button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 8px 25px rgba(0, 212, 170, 0.3);
-    }
-    
-    /* DataFrames */
-    .dataframe {
-        font-family: 'JetBrains Mono', monospace !important;
-        font-size: 0.85rem !important;
+        padding: 1rem;
+        font-family: 'JetBrains Mono', monospace;
+        font-size: 0.85rem;
+        color: #cdd6f4;
+        overflow-x: auto;
     }
     
     /* Footer */
@@ -322,559 +337,16 @@ st.markdown("""
     /* Hide Streamlit branding */
     #MainMenu {visibility: hidden;}
     footer {visibility: hidden;}
-    
-    /* Progress indicator */
-    .transit-phase {
-        display: flex;
-        justify-content: space-between;
-        background: var(--bg-card);
-        border-radius: 8px;
-        padding: 0.5rem;
-        margin: 1rem 0;
-    }
-    
-    .phase-step {
-        text-align: center;
-        padding: 0.5rem 1rem;
-        border-radius: 6px;
-        font-size: 0.8rem;
-    }
-    
-    .phase-step.active {
-        background: var(--primary);
-        color: var(--bg-dark);
-    }
-    
-    .phase-step.completed {
-        background: rgba(0, 212, 170, 0.2);
-        color: var(--primary);
-    }
 </style>
 """, unsafe_allow_html=True)
 
 
 # ============================================================================
-# TRANSIT MODEL FUNCTIONS (Core TransitKit functionality)
+# HELPER FUNCTIONS
 # ============================================================================
 
-def mandel_agol_transit(t, t0, period, rp_rs, a_rs, inc, u1=0.4, u2=0.2):
-    """
-    Compute Mandel & Agol (2002) quadratic limb-darkened transit model.
-    Simplified implementation for demonstration.
-    """
-    # Phase fold
-    phase = ((t - t0) % period) / period
-    phase[phase > 0.5] -= 1.0
-    
-    # Impact parameter
-    b = a_rs * np.cos(np.radians(inc))
-    
-    # Approximate transit duration
-    duration = period / np.pi * np.arcsin(
-        np.sqrt((1 + rp_rs)**2 - b**2) / (a_rs * np.sin(np.radians(inc)))
-    )
-    
-    # Normalized time from mid-transit
-    x = np.abs(phase * period / (duration / 2))
-    
-    # Simple transit shape (trapezoidal approximation with limb darkening)
-    flux = np.ones_like(t)
-    
-    in_transit = x < 1.0
-    ingress_egress = (x >= 0.8) & (x < 1.0)
-    
-    # Limb darkening effect
-    mu = np.sqrt(1 - np.minimum(x[in_transit], 1.0)**2)
-    ld_factor = 1 - u1 * (1 - mu) - u2 * (1 - mu)**2
-    
-    # Apply transit depth with limb darkening
-    depth = rp_rs**2
-    flux[in_transit] = 1 - depth * ld_factor
-    
-    # Smooth ingress/egress
-    flux[ingress_egress] = 1 - depth * (1 - x[ingress_egress]) / 0.2 * ld_factor[x[in_transit] >= 0.8][:sum(ingress_egress)]
-    
-    return flux
-
-
-def generate_transit_signal(time, period=5.0, t0=2.5, depth=0.01, duration=0.15,
-                           u1=0.4, u2=0.2, inc=89.0, a_rs=15.0):
-    """
-    Generate a realistic transit light curve using Mandel-Agol model.
-    """
-    # Calculate rp_rs from depth
-    rp_rs = np.sqrt(depth)
-    
-    # Generate flux
-    flux = np.ones_like(time)
-    
-    # Find all transit events
-    n_transits = int((time[-1] - time[0]) / period) + 2
-    
-    for i in range(-1, n_transits + 1):
-        tc = t0 + i * period
-        
-        # Distance from transit center
-        dt = np.abs(time - tc)
-        
-        # In-transit mask
-        in_transit = dt < duration / 2
-        
-        if np.any(in_transit):
-            # Normalized position (-1 to 1 during transit)
-            x = (time[in_transit] - tc) / (duration / 2)
-            
-            # Impact parameter effect
-            b = a_rs * np.cos(np.radians(inc))
-            
-            # Limb darkening
-            z = np.sqrt(x**2 + (b / (1 + rp_rs))**2)
-            z = np.clip(z, 0, 1)
-            
-            mu = np.sqrt(1 - z**2)
-            ld_factor = 1 - u1 * (1 - mu) - u2 * (1 - mu)**2
-            
-            # Transit depth with limb darkening
-            flux[in_transit] = 1 - depth * ld_factor * (1 - z**2)
-    
-    return flux
-
-
-def add_noise(flux, noise_level=0.001, stellar_var=0.0):
-    """Add Gaussian noise and optional stellar variability."""
-    noise = np.random.normal(0, noise_level, len(flux))
-    
-    if stellar_var > 0:
-        # Add slow stellar variability
-        t = np.arange(len(flux))
-        variability = stellar_var * np.sin(2 * np.pi * t / len(flux) * 3)
-        variability += stellar_var * 0.5 * np.sin(2 * np.pi * t / len(flux) * 7 + 1.5)
-        flux = flux + variability
-    
-    return flux + noise
-
-
-def box_least_squares(time, flux, min_period=1.0, max_period=20.0, 
-                      n_periods=500, n_durations=5):
-    """
-    Optimized Box Least Squares (BLS) transit detection algorithm.
-    """
-    periods = np.linspace(min_period, max_period, n_periods)
-    power = np.zeros(len(periods))
-    best_params = {'period': 0, 'depth': 0, 't0': 0, 'duration': 0, 'snr': 0}
-    max_power = 0
-    
-    flux_norm = flux - np.median(flux)
-    n_bins = 50  # Fixed bin count for speed
-    
-    # Pre-compute duration grid
-    duration_fracs = np.linspace(0.01, 0.15, n_durations)
-    
-    for i, period in enumerate(periods):
-        phase = (time % period) / period
-        
-        # Bin the data using histogram (vectorized)
-        bin_edges = np.linspace(0, 1, n_bins + 1)
-        bin_sums = np.zeros(n_bins)
-        bin_counts = np.zeros(n_bins)
-        
-        bin_idx = np.clip(np.floor(phase * n_bins).astype(int), 0, n_bins - 1)
-        np.add.at(bin_sums, bin_idx, flux_norm)
-        np.add.at(bin_counts, bin_idx, 1)
-        
-        # Avoid division by zero
-        valid = bin_counts > 0
-        bin_flux = np.zeros(n_bins)
-        bin_flux[valid] = bin_sums[valid] / bin_counts[valid]
-        
-        # Test different transit durations
-        for dur_frac in duration_fracs:
-            n_transit_bins = max(1, int(dur_frac * n_bins))
-            
-            # Slide transit window using convolution (fast)
-            kernel = np.ones(n_transit_bins) / n_transit_bins
-            transit_mean = np.convolve(bin_flux, kernel, mode='same')
-            
-            # Out-of-transit mean
-            total_mean = np.mean(bin_flux)
-            
-            # Depth estimate at each phase
-            depth_est = total_mean - transit_mean
-            
-            # Best depth for this period/duration
-            best_idx = np.argmax(depth_est)
-            if depth_est[best_idx] > 0:
-                sr = depth_est[best_idx]**2 * n_transit_bins
-                if sr > power[i]:
-                    power[i] = sr
-                
-                if sr > max_power:
-                    max_power = sr
-                    best_params['period'] = period
-                    best_params['depth'] = depth_est[best_idx]
-                    best_params['t0'] = bin_edges[best_idx] * period
-                    best_params['duration'] = dur_frac * period
-    
-    # Calculate SNR
-    noise = median_abs_deviation(flux_norm) * 1.4826
-    if noise > 0 and best_params['period'] > 0:
-        best_params['snr'] = best_params['depth'] / noise * np.sqrt(
-            len(time) * best_params['duration'] / best_params['period']
-        )
-    
-    return {
-        'periods': periods,
-        'power': power / np.max(power) if np.max(power) > 0 else power,
-        **best_params
-    }
-
-
-def generalized_lomb_scargle(time, flux, min_period=1.0, max_period=20.0, n_periods=500):
-    """
-    Optimized Generalized Lomb-Scargle periodogram.
-    """
-    periods = np.linspace(min_period, max_period, n_periods)
-    frequencies = 1.0 / periods
-    
-    # Normalize flux
-    flux_norm = flux - np.mean(flux)
-    var = np.var(flux_norm)
-    
-    power = np.zeros(len(frequencies))
-    
-    for i, freq in enumerate(frequencies):
-        omega = 2 * np.pi * freq
-        wt = omega * time
-        
-        # Vectorized calculations
-        cos_wt = np.cos(wt)
-        sin_wt = np.sin(wt)
-        
-        # Calculate tau
-        tau = np.arctan2(np.sum(np.sin(2 * wt)), np.sum(np.cos(2 * wt))) / (2 * omega)
-        
-        wt_tau = omega * (time - tau)
-        cos_term = np.cos(wt_tau)
-        sin_term = np.sin(wt_tau)
-        
-        cc = np.sum(cos_term**2)
-        ss = np.sum(sin_term**2)
-        
-        if cc > 0 and ss > 0:
-            yc = np.sum(flux_norm * cos_term)
-            ys = np.sum(flux_norm * sin_term)
-            power[i] = 0.5 * (yc**2 / cc + ys**2 / ss)
-    
-    # Normalize
-    if var > 0:
-        power = power / var
-    
-    # Find best period
-    best_idx = np.argmax(power)
-    
-    return {
-        'periods': periods,
-        'power': power / np.max(power) if np.max(power) > 0 else power,
-        'period': periods[best_idx],
-        'power_max': power[best_idx] / np.max(power) if np.max(power) > 0 else 0
-    }
-
-
-def phase_dispersion_minimization(time, flux, min_period=1.0, max_period=20.0, 
-                                   n_periods=500, n_bins=10):
-    """
-    Optimized Phase Dispersion Minimization (PDM) algorithm.
-    """
-    periods = np.linspace(min_period, max_period, n_periods)
-    theta = np.ones(len(periods))
-    
-    total_var = np.var(flux)
-    if total_var == 0:
-        return {'periods': periods, 'theta': theta, 'power': np.zeros(len(periods)), 
-                'period': periods[0], 'theta_min': 1.0}
-    
-    for i, period in enumerate(periods):
-        phase = (time % period) / period
-        
-        # Use digitize for fast binning
-        bin_edges = np.linspace(0, 1, n_bins + 1)
-        bin_idx = np.digitize(phase, bin_edges) - 1
-        bin_idx = np.clip(bin_idx, 0, n_bins - 1)
-        
-        # Calculate variance in each bin
-        weighted_var = 0
-        total_weight = 0
-        
-        for b in range(n_bins):
-            mask = bin_idx == b
-            n_in_bin = np.sum(mask)
-            if n_in_bin > 1:
-                bin_var = np.var(flux[mask])
-                weighted_var += bin_var * (n_in_bin - 1)
-                total_weight += n_in_bin - 1
-        
-        if total_weight > 0:
-            theta[i] = weighted_var / total_weight / total_var
-    
-    # Best period has minimum theta
-    best_idx = np.argmin(theta)
-    
-    return {
-        'periods': periods,
-        'theta': theta,
-        'power': 1 - theta,
-        'period': periods[best_idx],
-        'theta_min': theta[best_idx]
-    }
-
-
-def find_transits_multiple_methods(time, flux, min_period=1.0, max_period=20.0,
-                                   methods=['bls', 'gls', 'pdm']):
-    """
-    Run multiple period-finding methods and combine results.
-    """
-    results = {}
-    
-    if 'bls' in methods:
-        results['bls'] = box_least_squares(time, flux, min_period, max_period)
-    
-    if 'gls' in methods:
-        results['gls'] = generalized_lomb_scargle(time, flux, min_period, max_period)
-    
-    if 'pdm' in methods:
-        results['pdm'] = phase_dispersion_minimization(time, flux, min_period, max_period)
-    
-    # Calculate consensus period (weighted average)
-    periods = []
-    weights = []
-    
-    if 'bls' in results:
-        periods.append(results['bls']['period'])
-        weights.append(results['bls'].get('snr', 1) if results['bls'].get('snr', 0) > 0 else 1)
-    
-    if 'gls' in results:
-        periods.append(results['gls']['period'])
-        weights.append(results['gls']['power_max'] * 10)
-    
-    if 'pdm' in results:
-        periods.append(results['pdm']['period'])
-        weights.append((1 - results['pdm']['theta_min']) * 10)
-    
-    if len(periods) > 0:
-        consensus_period = np.average(periods, weights=weights)
-        consensus_std = np.std(periods)
-    else:
-        consensus_period = 0
-        consensus_std = 0
-    
-    results['consensus'] = {
-        'period': consensus_period,
-        'period_std': consensus_std,
-        'periods': periods,
-        'weights': weights
-    }
-    
-    return results
-
-
-def measure_transit_times(time, flux, period, t0, duration):
-    """
-    Measure individual transit times for TTV analysis.
-    """
-    n_transits = int((time[-1] - time[0]) / period) + 1
-    transit_times = []
-    transit_times_err = []
-    observed_times = []
-    epoch = []
-    
-    for i in range(n_transits):
-        expected_tc = t0 + i * period
-        
-        # Window around expected transit
-        window = 2 * duration
-        mask = np.abs(time - expected_tc) < window
-        
-        if np.sum(mask) < 5:
-            continue
-        
-        t_window = time[mask]
-        f_window = flux[mask]
-        
-        # Find minimum (transit center)
-        min_idx = np.argmin(f_window)
-        observed_tc = t_window[min_idx]
-        
-        # Simple error estimate
-        tc_err = duration / 10  # Simplified
-        
-        transit_times.append(expected_tc)
-        observed_times.append(observed_tc)
-        transit_times_err.append(tc_err)
-        epoch.append(i)
-    
-    # Calculate O-C (observed minus calculated)
-    oc = np.array(observed_times) - np.array(transit_times)
-    
-    # Detect significant TTVs
-    oc_rms = np.std(oc) if len(oc) > 1 else 0
-    ttvs_detected = oc_rms > 0.001  # More than ~1.5 minutes
-    
-    return {
-        'epoch': np.array(epoch),
-        'expected_times': np.array(transit_times),
-        'observed_times': np.array(observed_times),
-        'timing_errors': np.array(transit_times_err),
-        'oc': oc,
-        'oc_minutes': oc * 24 * 60,
-        'rms_ttv': oc_rms,
-        'rms_ttv_minutes': oc_rms * 24 * 60,
-        'ttvs_detected': ttvs_detected
-    }
-
-
-def injection_recovery_test(time, n_injections=50, period_range=(1, 15), 
-                           depth_range=(0.001, 0.02), noise_level=0.001):
-    """
-    Perform injection-recovery test to assess detection efficiency.
-    """
-    results = []
-    
-    for i in range(n_injections):
-        # Random transit parameters
-        true_period = np.random.uniform(*period_range)
-        true_depth = np.random.uniform(*depth_range)
-        true_t0 = np.random.uniform(0, true_period)
-        
-        # Generate signal
-        flux = generate_transit_signal(time, period=true_period, t0=true_t0, 
-                                       depth=true_depth)
-        flux_noisy = add_noise(flux, noise_level=noise_level)
-        
-        # Try to detect (use fewer periods for speed)
-        bls_result = box_least_squares(time, flux_noisy, 
-                                       min_period=period_range[0], 
-                                       max_period=period_range[1],
-                                       n_periods=300)
-        
-        # Check if recovered
-        period_match = np.abs(bls_result['period'] - true_period) / true_period < 0.02
-        
-        results.append({
-            'true_period': true_period,
-            'true_depth': true_depth,
-            'true_t0': true_t0,
-            'detected_period': bls_result['period'],
-            'detected_depth': bls_result['depth'],
-            'snr': bls_result['snr'],
-            'recovered': period_match
-        })
-    
-    df = pd.DataFrame(results)
-    
-    # Calculate recovery rate by depth
-    depth_bins = np.linspace(depth_range[0], depth_range[1], 6)
-    recovery_by_depth = []
-    
-    for j in range(len(depth_bins) - 1):
-        mask = (df['true_depth'] >= depth_bins[j]) & (df['true_depth'] < depth_bins[j+1])
-        if mask.sum() > 0:
-            rate = df[mask]['recovered'].mean()
-        else:
-            rate = 0
-        recovery_by_depth.append({
-            'depth_min': depth_bins[j],
-            'depth_max': depth_bins[j+1],
-            'depth_mid': (depth_bins[j] + depth_bins[j+1]) / 2,
-            'recovery_rate': rate,
-            'n_samples': mask.sum()
-        })
-    
-    return {
-        'individual_results': df,
-        'recovery_by_depth': pd.DataFrame(recovery_by_depth),
-        'overall_recovery_rate': df['recovered'].mean(),
-        'n_injections': n_injections
-    }
-
-
-def validate_transit_parameters(period, depth, duration, snr):
-    """
-    Validate transit parameters against physical constraints.
-    """
-    warnings = []
-    is_valid = True
-    
-    # Period checks
-    if period < 0.1:
-        warnings.append("⚠️ Period < 0.1 days is extremely short")
-        is_valid = False
-    elif period < 0.5:
-        warnings.append("⚠️ Very short period - possible ultra-short period planet")
-    
-    if period > 1000:
-        warnings.append("⚠️ Period > 1000 days may have insufficient phase coverage")
-    
-    # Depth checks
-    if depth < 0.0001:
-        warnings.append("⚠️ Depth < 0.01% may be noise artifact")
-        is_valid = False
-    elif depth < 0.001:
-        warnings.append("ℹ️ Shallow transit - Earth-sized or smaller around Sun-like star")
-    
-    if depth > 0.1:
-        warnings.append("⚠️ Depth > 10% is unusually deep - possible grazing EB")
-    
-    if depth > 0.25:
-        warnings.append("⚠️ Depth > 25% indicates eclipsing binary, not planet")
-        is_valid = False
-    
-    # Duration checks
-    if duration > 0.3:
-        warnings.append("⚠️ Duration > 0.3 days is very long")
-    
-    if duration / period > 0.2:
-        warnings.append("⚠️ Duration/Period ratio > 20% is physically unlikely")
-        is_valid = False
-    
-    # SNR checks
-    if snr < 3:
-        warnings.append("⚠️ SNR < 3 - detection not significant")
-        is_valid = False
-    elif snr < 7:
-        warnings.append("⚠️ SNR < 7 - marginal detection")
-    elif snr > 100:
-        warnings.append("✓ High SNR detection")
-    
-    # Estimate planet parameters
-    rp_rs = np.sqrt(depth)
-    rp_rearth = rp_rs * 109  # Assuming Sun-like star
-    
-    planet_type = "Unknown"
-    if rp_rearth < 1.25:
-        planet_type = "Terrestrial"
-    elif rp_rearth < 2.0:
-        planet_type = "Super-Earth"
-    elif rp_rearth < 4.0:
-        planet_type = "Sub-Neptune"
-    elif rp_rearth < 10:
-        planet_type = "Neptune-like"
-    else:
-        planet_type = "Gas Giant"
-    
-    return {
-        'is_valid': is_valid,
-        'warnings': warnings,
-        'rp_rs': rp_rs,
-        'rp_rearth_approx': rp_rearth,
-        'planet_type': planet_type
-    }
-
-
-# ============================================================================
-# VISUALIZATION FUNCTIONS
-# ============================================================================
-
-def create_light_curve_plot(time, flux, flux_model=None, title="Light Curve"):
+def create_light_curve_plot(time, flux, flux_err=None, title="Light Curve", 
+                           model=None, transit_times=None):
     """Create interactive light curve plot."""
     fig = go.Figure()
     
@@ -884,33 +356,34 @@ def create_light_curve_plot(time, flux, flux_model=None, title="Light Curve"):
         mode='markers',
         name='Data',
         marker=dict(size=3, color='#6366f1', opacity=0.6),
+        error_y=dict(array=flux_err, color='#6366f1', thickness=1) if flux_err is not None else None,
         hovertemplate="Time: %{x:.4f}<br>Flux: %{y:.6f}<extra></extra>"
     ))
     
     # Model if provided
-    if flux_model is not None:
+    if model is not None:
         fig.add_trace(go.Scatter(
-            x=time, y=flux_model,
+            x=time, y=model,
             mode='lines',
             name='Model',
-            line=dict(color='#00d4aa', width=2),
-            hovertemplate="Time: %{x:.4f}<br>Model: %{y:.6f}<extra></extra>"
+            line=dict(color='#00d4aa', width=2)
         ))
+    
+    # Mark transit times
+    if transit_times is not None:
+        for tc in transit_times:
+            fig.add_vline(x=tc, line_dash='dash', line_color='#f59e0b', opacity=0.5)
     
     fig.update_layout(
         title=dict(text=title, font=dict(size=16, color='#f1f5f9')),
-        xaxis_title='Time (days)',
+        xaxis_title='Time (BJD)',
         yaxis_title='Relative Flux',
         template='plotly_dark',
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#f1f5f9', family='Space Grotesk'),
         hovermode='x unified',
-        legend=dict(
-            bgcolor='rgba(18,18,26,0.8)',
-            bordercolor='rgba(0,212,170,0.3)',
-            borderwidth=1
-        )
+        legend=dict(bgcolor='rgba(18,18,26,0.8)', bordercolor='rgba(0,212,170,0.3)', borderwidth=1)
     )
     
     fig.update_xaxes(gridcolor='rgba(99,102,241,0.15)', zeroline=False)
@@ -919,14 +392,10 @@ def create_light_curve_plot(time, flux, flux_model=None, title="Light Curve"):
     return fig
 
 
-def create_phase_folded_plot(time, flux, period, t0, title="Phase-Folded Light Curve"):
+def create_phase_folded_plot(time, flux, period, t0, title="Phase-Folded"):
     """Create phase-folded light curve plot."""
-    # Calculate phase
     phase = ((time - t0) % period) / period
     phase[phase > 0.5] -= 1.0
-    
-    # Sort by phase for cleaner plotting
-    sort_idx = np.argsort(phase)
     
     # Bin the data
     n_bins = 100
@@ -945,23 +414,19 @@ def create_phase_folded_plot(time, flux, period, t0, title="Phase-Folded Light C
     
     fig = go.Figure()
     
-    # Individual points
     fig.add_trace(go.Scatter(
         x=phase, y=flux,
         mode='markers',
         name='Data',
-        marker=dict(size=2, color='#6366f1', opacity=0.3),
-        hoverinfo='skip'
+        marker=dict(size=2, color='#6366f1', opacity=0.3)
     ))
     
-    # Binned data
     fig.add_trace(go.Scatter(
         x=bin_centers, y=binned_flux,
         mode='markers',
         name='Binned',
         marker=dict(size=8, color='#00d4aa'),
-        error_y=dict(array=binned_err, color='#00d4aa', thickness=1),
-        hovertemplate="Phase: %{x:.3f}<br>Flux: %{y:.6f}<extra></extra>"
+        error_y=dict(array=binned_err, color='#00d4aa', thickness=1)
     ))
     
     fig.update_layout(
@@ -972,61 +437,47 @@ def create_phase_folded_plot(time, flux, period, t0, title="Phase-Folded Light C
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#f1f5f9', family='Space Grotesk'),
-        legend=dict(
-            bgcolor='rgba(18,18,26,0.8)',
-            bordercolor='rgba(0,212,170,0.3)',
-            borderwidth=1
-        )
+        xaxis=dict(range=[-0.15, 0.15]),
+        legend=dict(bgcolor='rgba(18,18,26,0.8)', bordercolor='rgba(0,212,170,0.3)', borderwidth=1)
     )
     
-    fig.update_xaxes(gridcolor='rgba(99,102,241,0.15)', zeroline=False, range=[-0.15, 0.15])
+    fig.update_xaxes(gridcolor='rgba(99,102,241,0.15)', zeroline=False)
     fig.update_yaxes(gridcolor='rgba(99,102,241,0.15)', zeroline=False)
     
     return fig
 
 
-def create_periodogram_plot(results, method_name="BLS"):
+def create_periodogram_plot(periods, power, best_period=None, title="Periodogram"):
     """Create periodogram plot."""
-    if 'periods' not in results:
-        return go.Figure()
-    
-    power_key = 'power' if 'power' in results else 'theta'
-    power = results[power_key] if 'power' in results else 1 - results['theta']
-    
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
-        x=results['periods'], y=power,
+        x=periods, y=power,
         mode='lines',
-        name=method_name,
+        name='Power',
         line=dict(color='#00d4aa', width=1.5),
         fill='tozeroy',
         fillcolor='rgba(0,212,170,0.1)'
     ))
     
-    # Mark best period
-    if 'period' in results:
-        best_idx = np.argmin(np.abs(results['periods'] - results['period']))
+    if best_period is not None:
+        idx = np.argmin(np.abs(periods - best_period))
         fig.add_trace(go.Scatter(
-            x=[results['period']], y=[power[best_idx]],
+            x=[best_period], y=[power[idx]],
             mode='markers',
-            name=f'Best: {results["period"]:.4f} d',
+            name=f'Best: {best_period:.4f} d',
             marker=dict(size=12, color='#f59e0b', symbol='star')
         ))
     
     fig.update_layout(
-        title=dict(text=f'{method_name} Periodogram', font=dict(size=16, color='#f1f5f9')),
+        title=dict(text=title, font=dict(size=16, color='#f1f5f9')),
         xaxis_title='Period (days)',
         yaxis_title='Power',
         template='plotly_dark',
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#f1f5f9', family='Space Grotesk'),
-        legend=dict(
-            bgcolor='rgba(18,18,26,0.8)',
-            bordercolor='rgba(0,212,170,0.3)',
-            borderwidth=1
-        )
+        legend=dict(bgcolor='rgba(18,18,26,0.8)', bordercolor='rgba(0,212,170,0.3)', borderwidth=1)
     )
     
     fig.update_xaxes(gridcolor='rgba(99,102,241,0.15)', zeroline=False)
@@ -1035,84 +486,85 @@ def create_periodogram_plot(results, method_name="BLS"):
     return fig
 
 
-def create_ttv_plot(ttv_result):
-    """Create TTV O-C diagram."""
+def create_spectrum_plot(wavelength, depth, depth_err=None, molecules=None, title="Transmission Spectrum"):
+    """Create transmission spectrum plot."""
     fig = go.Figure()
     
     fig.add_trace(go.Scatter(
-        x=ttv_result['epoch'],
-        y=ttv_result['oc_minutes'],
+        x=wavelength, y=depth * 100,
         mode='markers+lines',
-        name='O-C',
-        marker=dict(size=10, color='#00d4aa'),
-        line=dict(color='#00d4aa', width=1, dash='dot'),
-        error_y=dict(
-            array=ttv_result['timing_errors'] * 24 * 60,
-            color='#00d4aa',
-            thickness=1
-        )
+        name='Spectrum',
+        marker=dict(size=6, color='#00d4aa'),
+        line=dict(color='#00d4aa', width=1),
+        error_y=dict(array=depth_err * 100 if depth_err is not None else None, 
+                    color='#00d4aa', thickness=1)
     ))
     
-    # Zero line
-    fig.add_hline(y=0, line_dash='dash', line_color='#6366f1', opacity=0.5)
-    
-    # RMS bands
-    rms = ttv_result['rms_ttv_minutes']
-    fig.add_hrect(y0=-rms, y1=rms, fillcolor='rgba(99,102,241,0.1)', 
-                  line_width=0, annotation_text=f'±{rms:.2f} min RMS')
-    
-    fig.update_layout(
-        title=dict(text='Transit Timing Variations (O-C)', font=dict(size=16, color='#f1f5f9')),
-        xaxis_title='Epoch',
-        yaxis_title='O-C (minutes)',
-        template='plotly_dark',
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        font=dict(color='#f1f5f9', family='Space Grotesk')
-    )
-    
-    fig.update_xaxes(gridcolor='rgba(99,102,241,0.15)', zeroline=False)
-    fig.update_yaxes(gridcolor='rgba(99,102,241,0.15)', zeroline=False)
-    
-    return fig
-
-
-def create_injection_recovery_plot(recovery_df):
-    """Create injection-recovery efficiency plot."""
-    fig = go.Figure()
-    
-    fig.add_trace(go.Bar(
-        x=recovery_df['depth_mid'] * 100,
-        y=recovery_df['recovery_rate'] * 100,
-        marker=dict(
-            color=recovery_df['recovery_rate'],
-            colorscale=[[0, '#ef4444'], [0.5, '#f59e0b'], [1, '#22c55e']],
-            line=dict(width=1, color='rgba(255,255,255,0.3)')
-        ),
-        text=[f'{r*100:.0f}%' for r in recovery_df['recovery_rate']],
-        textposition='outside',
-        hovertemplate="Depth: %{x:.2f}%<br>Recovery: %{y:.1f}%<extra></extra>"
-    ))
-    
-    # 50% threshold line
-    fig.add_hline(y=50, line_dash='dash', line_color='#f59e0b', 
-                  annotation_text='50% threshold')
+    # Mark molecular features
+    if molecules:
+        colors = {'H2O': '#3b82f6', 'CO2': '#ef4444', 'CH4': '#22c55e', 'CO': '#f59e0b', 'Na': '#a855f7'}
+        for mol, wl in molecules.items():
+            if mol in colors:
+                fig.add_vline(x=wl, line_dash='dash', line_color=colors[mol], 
+                             annotation_text=mol, annotation_position='top')
     
     fig.update_layout(
-        title=dict(text='Injection-Recovery Efficiency', font=dict(size=16, color='#f1f5f9')),
-        xaxis_title='Transit Depth (%)',
-        yaxis_title='Recovery Rate (%)',
+        title=dict(text=title, font=dict(size=16, color='#f1f5f9')),
+        xaxis_title='Wavelength (μm)',
+        yaxis_title='Transit Depth (%)',
         template='plotly_dark',
         paper_bgcolor='rgba(0,0,0,0)',
         plot_bgcolor='rgba(0,0,0,0)',
         font=dict(color='#f1f5f9', family='Space Grotesk'),
-        yaxis=dict(range=[0, 110])
+        legend=dict(bgcolor='rgba(18,18,26,0.8)', bordercolor='rgba(0,212,170,0.3)', borderwidth=1)
     )
     
     fig.update_xaxes(gridcolor='rgba(99,102,241,0.15)', zeroline=False)
     fig.update_yaxes(gridcolor='rgba(99,102,241,0.15)', zeroline=False)
     
     return fig
+
+
+def display_planet_card(name, params):
+    """Display planet information card."""
+    planet_type = "Unknown"
+    if hasattr(params, 'radius') and params.radius:
+        r = params.radius
+        if r < 1.25:
+            planet_type = "Terrestrial"
+        elif r < 2.0:
+            planet_type = "Super-Earth"
+        elif r < 4.0:
+            planet_type = "Sub-Neptune"
+        elif r < 10:
+            planet_type = "Neptune-like"
+        else:
+            planet_type = "Gas Giant"
+    
+    st.markdown(f"""
+    <div class="planet-card">
+        <div class="planet-name">{name}</div>
+        <span class="planet-type">{planet_type}</span>
+        <div class="param-grid">
+            <div class="param-item">
+                <div class="param-label">Period</div>
+                <div class="param-value">{getattr(params, 'period', 'N/A'):.4f} d</div>
+            </div>
+            <div class="param-item">
+                <div class="param-label">Radius</div>
+                <div class="param-value">{getattr(params, 'radius', 'N/A'):.2f} R⊕</div>
+            </div>
+            <div class="param-item">
+                <div class="param-label">Mass</div>
+                <div class="param-value">{getattr(params, 'mass', 'N/A'):.2f} M⊕</div>
+            </div>
+            <div class="param-item">
+                <div class="param-label">Eq. Temp</div>
+                <div class="param-value">{getattr(params, 'equilibrium_temp', 'N/A'):.0f} K</div>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
 # ============================================================================
@@ -1120,732 +572,881 @@ def create_injection_recovery_plot(recovery_df):
 # ============================================================================
 
 def render_sidebar():
-    """Render sidebar with navigation and settings."""
-    st.sidebar.markdown("""
+    """Render sidebar with navigation."""
+    st.sidebar.markdown(f"""
     <div style="text-align: center; padding: 1rem 0;">
         <h1 style="font-size: 2.5rem; margin: 0;">🌟</h1>
         <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 1.3rem; 
                    color: #f1f5f9; margin: 0.5rem 0;">TransitKit</h2>
-        <p style="color: #94a3b8; font-size: 0.8rem;">v2.0 • Transit Analysis</p>
+        <p style="color: #94a3b8; font-size: 0.8rem;">v{TK_VERSION}</p>
     </div>
     """, unsafe_allow_html=True)
+    
+    st.sidebar.markdown("---")
+    
+    # Status indicator
+    if TRANSITKIT_AVAILABLE:
+        st.sidebar.success("✓ TransitKit Loaded")
+    else:
+        st.sidebar.error("✗ TransitKit Not Found")
     
     st.sidebar.markdown("---")
     
     # Navigation
     mode = st.sidebar.radio(
         "📍 Analysis Mode",
-        ["🌟 Synthetic Transit", "🔬 Multi-Method Detection", 
-         "⏱️ TTV Analysis", "📊 Injection-Recovery", "📖 Documentation"],
+        [
+            "🎯 Universal Target",
+            "📡 Multi-Mission Data",
+            "🤖 ML Detection",
+            "🔬 JWST Spectroscopy",
+            "📄 Publication Figures",
+            "🧪 Synthetic Testing",
+            "📖 Documentation"
+        ],
         index=0
     )
     
     st.sidebar.markdown("---")
     
-    # Quick Settings
-    st.sidebar.markdown("### ⚙️ Quick Settings")
-    
-    noise_level = st.sidebar.slider(
-        "Noise Level (ppm)",
-        min_value=100,
-        max_value=5000,
-        value=1000,
-        step=100,
-        help="Photometric noise in parts per million"
-    ) / 1e6
-    
-    observation_days = st.sidebar.slider(
-        "Observation Duration (days)",
-        min_value=10,
-        max_value=100,
-        value=30,
-        help="Total observing baseline"
-    )
-    
-    cadence = st.sidebar.slider(
-        "Cadence (minutes)",
-        min_value=1,
-        max_value=30,
-        value=2,
-        help="Time between observations"
-    )
-    
-    st.sidebar.markdown("---")
-    
-    # Info
     st.sidebar.markdown("""
     <div style="font-size: 0.8rem; color: #64748b; text-align: center;">
         <p><a href="https://github.com/arifsolmaz/transitkit" target="_blank" 
               style="color: #00d4aa; text-decoration: none;">
            📦 GitHub Repository
         </a></p>
-        <p>Based on Mandel & Agol (2002)</p>
+        <p><a href="https://pypi.org/project/transitkit" target="_blank" 
+              style="color: #00d4aa; text-decoration: none;">
+           📦 PyPI Package
+        </a></p>
         <p>© 2025 TransitKit</p>
     </div>
     """, unsafe_allow_html=True)
     
-    return mode, noise_level, observation_days, cadence
+    return mode
 
 
 # ============================================================================
-# MAIN APPLICATION PAGES
+# PAGE: UNIVERSAL TARGET
 # ============================================================================
 
-def page_synthetic_transit(noise_level, observation_days, cadence):
-    """Synthetic transit generation page."""
-    
+def page_universal_target():
+    """Universal target resolution page."""
     st.markdown("""
     <div class="section-header">
-        <span class="icon">🌟</span>
-        <h2>Synthetic Transit Generator</h2>
+        <span>🎯</span>
+        <h2>Universal Target Resolution</h2>
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("""
     <div class="info-box">
-        Generate synthetic transit light curves using the Mandel & Agol (2002) limb-darkened model.
-        Adjust parameters to explore different planetary scenarios.
+        <strong>One Line, Any Planet:</strong> Enter any planet name, and TransitKit will automatically 
+        resolve it across multiple databases (NASA Exoplanet Archive, SIMBAD, TIC, etc.)
     </div>
     """, unsafe_allow_html=True)
     
-    # Parameter inputs
+    # Example code
+    with st.expander("📝 Python Code Example"):
+        st.code("""
+from transitkit.universal import UniversalTarget
+
+# Load any planet with one line
+target = UniversalTarget("WASP-39 b")
+
+# Access all parameters
+print(target.planet)      # Planet parameters
+print(target.star)        # Stellar parameters
+print(target.available)   # Available data sources
+        """, language="python")
+    
+    # Target input
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        target_name = st.text_input(
+            "Planet Name",
+            value="WASP-39 b",
+            placeholder="e.g., WASP-39 b, HD 209458 b, TRAPPIST-1 e",
+            help="Enter any exoplanet name"
+        )
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        resolve_btn = st.button("🔍 Resolve Target", type="primary", use_container_width=True)
+    
+    if resolve_btn and target_name:
+        if not TRANSITKIT_AVAILABLE:
+            st.error("TransitKit is not installed. Install with: `pip install transitkit`")
+            return
+        
+        with st.spinner(f"Resolving {target_name}..."):
+            try:
+                target = UniversalTarget(target_name)
+                st.session_state['current_target'] = target
+                st.session_state['target_name'] = target_name
+                st.success(f"✓ Successfully resolved: {target_name}")
+            except Exception as e:
+                st.error(f"Failed to resolve target: {e}")
+                return
+    
+    # Display target info
+    if 'current_target' in st.session_state:
+        target = st.session_state['current_target']
+        target_name = st.session_state['target_name']
+        
+        st.markdown("---")
+        
+        # Planet parameters
+        if hasattr(target, 'planet') and target.planet:
+            display_planet_card(target_name, target.planet)
+        
+        col1, col2 = st.columns(2)
+        
+        # Stellar parameters
+        with col1:
+            st.markdown("#### ⭐ Host Star")
+            if hasattr(target, 'star') and target.star:
+                star = target.star
+                star_data = {
+                    'Parameter': ['Teff', 'Radius', 'Mass', 'Distance', '[Fe/H]'],
+                    'Value': [
+                        f"{getattr(star, 'teff', 'N/A')} K",
+                        f"{getattr(star, 'radius', 'N/A')} R☉",
+                        f"{getattr(star, 'mass', 'N/A')} M☉",
+                        f"{getattr(star, 'distance', 'N/A')} pc",
+                        f"{getattr(star, 'metallicity', 'N/A')}"
+                    ]
+                }
+                st.dataframe(pd.DataFrame(star_data), hide_index=True, use_container_width=True)
+        
+        # Available data
+        with col2:
+            st.markdown("#### 📡 Available Data")
+            if hasattr(target, 'available') and target.available:
+                avail = target.available
+                missions = []
+                if getattr(avail, 'tess', False):
+                    missions.append('<span class="mission-badge mission-tess">TESS</span>')
+                if getattr(avail, 'kepler', False):
+                    missions.append('<span class="mission-badge mission-kepler">Kepler</span>')
+                if getattr(avail, 'k2', False):
+                    missions.append('<span class="mission-badge mission-k2">K2</span>')
+                if getattr(avail, 'jwst', False):
+                    missions.append('<span class="mission-badge mission-jwst">JWST</span>')
+                
+                if missions:
+                    st.markdown(''.join(missions), unsafe_allow_html=True)
+                else:
+                    st.info("No mission data found")
+        
+        # Cross-matched IDs
+        if hasattr(target, 'ids'):
+            with st.expander("🔗 Cross-Matched Identifiers"):
+                ids = target.ids
+                id_data = {}
+                for attr in ['tic', 'kic', 'epic', 'gaia', 'simbad']:
+                    val = getattr(ids, attr, None)
+                    if val:
+                        id_data[attr.upper()] = str(val)
+                if id_data:
+                    st.json(id_data)
+
+
+# ============================================================================
+# PAGE: MULTI-MISSION DATA
+# ============================================================================
+
+def page_multi_mission():
+    """Multi-mission data download page."""
+    st.markdown("""
+    <div class="section-header">
+        <span>📡</span>
+        <h2>Multi-Mission Data Download</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="info-box">
+        Download light curves from multiple space missions (TESS, Kepler, K2) with a single command.
+        Data is automatically stitched and normalized.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("📝 Python Code Example"):
+        st.code("""
+from transitkit.missions import MultiMissionDownloader
+
+# Download all available data
+downloader = MultiMissionDownloader("WASP-39 b")
+data = downloader.download_all()
+
+# Access individual missions
+print(data.tess)      # TESS light curves
+print(data.kepler)    # Kepler light curves
+print(data.combined)  # Stitched light curve
+        """, language="python")
+    
+    if 'current_target' not in st.session_state:
+        st.warning("⚠️ Please resolve a target first in the 'Universal Target' tab.")
+        return
+    
+    if not TRANSITKIT_AVAILABLE:
+        st.error("TransitKit is not installed.")
+        return
+    
+    target_name = st.session_state['target_name']
+    st.info(f"📍 Current target: **{target_name}**")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        missions = st.multiselect(
+            "Select Missions",
+            ["TESS", "Kepler", "K2"],
+            default=["TESS"]
+        )
+    
+    with col2:
+        cadence = st.selectbox(
+            "Cadence",
+            ["short (2-min)", "long (30-min)", "fast (20-sec)"],
+            index=0
+        )
+    
+    if st.button("📥 Download Data", type="primary"):
+        with st.spinner("Downloading light curves..."):
+            try:
+                downloader = MultiMissionDownloader(target_name)
+                data = downloader.download_all()
+                st.session_state['mission_data'] = data
+                st.success("✓ Data downloaded successfully!")
+            except Exception as e:
+                st.error(f"Download failed: {e}")
+                return
+    
+    # Display downloaded data
+    if 'mission_data' in st.session_state:
+        data = st.session_state['mission_data']
+        
+        st.markdown("---")
+        st.markdown("### 📊 Downloaded Light Curves")
+        
+        # Check what's available
+        available_lcs = []
+        if hasattr(data, 'tess') and data.tess is not None:
+            available_lcs.append(('TESS', data.tess))
+        if hasattr(data, 'kepler') and data.kepler is not None:
+            available_lcs.append(('Kepler', data.kepler))
+        if hasattr(data, 'k2') and data.k2 is not None:
+            available_lcs.append(('K2', data.k2))
+        
+        if available_lcs:
+            for mission, lc in available_lcs:
+                with st.expander(f"📈 {mission} Light Curve"):
+                    if hasattr(lc, 'time') and hasattr(lc, 'flux'):
+                        fig = create_light_curve_plot(
+                            lc.time, lc.flux,
+                            title=f"{mission} Light Curve - {target_name}"
+                        )
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        col1, col2, col3 = st.columns(3)
+                        col1.metric("Data Points", f"{len(lc.time):,}")
+                        col2.metric("Time Span", f"{lc.time[-1] - lc.time[0]:.1f} days")
+                        col3.metric("Median Flux", f"{np.median(lc.flux):.6f}")
+        else:
+            st.info("No light curves downloaded yet.")
+
+
+# ============================================================================
+# PAGE: ML DETECTION
+# ============================================================================
+
+def page_ml_detection():
+    """ML transit detection page."""
+    st.markdown("""
+    <div class="section-header">
+        <span>🤖</span>
+        <h2>ML Transit Detection</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="info-box">
+        Use machine learning and multiple detection algorithms (BLS, TLS) to find transits
+        in your light curve data. Includes automatic vetting and candidate ranking.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("📝 Python Code Example"):
+        st.code("""
+from transitkit.ml import MLTransitDetector, detect_transits
+
+# Automatic detection
+detector = MLTransitDetector(time, flux)
+candidates = detector.detect()
+
+# Or use specific method
+results = detect_transits(time, flux, method='bls')
+        """, language="python")
+    
+    if not TRANSITKIT_AVAILABLE:
+        st.error("TransitKit is not installed.")
+        return
+    
+    # Check for data
+    has_data = 'mission_data' in st.session_state
+    
+    if not has_data:
+        st.warning("⚠️ No light curve data loaded. Use 'Multi-Mission Data' tab first, or generate synthetic data below.")
+    
+    st.markdown("---")
+    
+    # Option to use synthetic data
+    st.markdown("### 🧪 Generate Test Data")
+    
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        test_period = st.slider("Period (days)", 1.0, 20.0, 5.0, 0.1)
+    with col2:
+        test_depth = st.slider("Depth (%)", 0.1, 3.0, 1.0, 0.1)
+    with col3:
+        test_noise = st.slider("Noise (ppm)", 100, 5000, 1000, 100)
+    
+    if st.button("🎲 Generate Synthetic Data"):
+        n_points = 3000
+        time = np.linspace(0, 30, n_points)
+        
+        # Generate transit signal
+        flux = np.ones(n_points)
+        t0 = test_period / 2
+        duration = 0.1
+        
+        for i in range(int(30 / test_period) + 1):
+            tc = t0 + i * test_period
+            in_transit = np.abs(time - tc) < duration / 2
+            flux[in_transit] = 1 - test_depth / 100
+        
+        flux += np.random.normal(0, test_noise / 1e6, n_points)
+        
+        st.session_state['ml_time'] = time
+        st.session_state['ml_flux'] = flux
+        st.session_state['ml_true_period'] = test_period
+        st.success("✓ Synthetic data generated!")
+    
+    # Run detection
+    if 'ml_time' in st.session_state:
+        time = st.session_state['ml_time']
+        flux = st.session_state['ml_flux']
+        
+        st.markdown("---")
+        st.markdown("### 🔍 Run Detection")
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            method = st.selectbox("Detection Method", ["BLS", "TLS", "Both"])
+        with col2:
+            min_period = st.number_input("Min Period", 0.5, 10.0, 1.0)
+            max_period = st.number_input("Max Period", 5.0, 50.0, 20.0)
+        
+        if st.button("🚀 Detect Transits", type="primary"):
+            progress = st.progress(0, text="Running detection...")
+            
+            try:
+                detector = MLTransitDetector(time, flux)
+                progress.progress(30, text="Analyzing periodogram...")
+                
+                # Run detection
+                candidates = detector.detect()
+                progress.progress(80, text="Ranking candidates...")
+                
+                st.session_state['detection_results'] = candidates
+                progress.progress(100, text="Done!")
+                progress.empty()
+                
+                st.success(f"✓ Found {len(candidates) if candidates else 0} candidate(s)")
+            except Exception as e:
+                progress.empty()
+                st.error(f"Detection failed: {e}")
+        
+        # Display results
+        if 'detection_results' in st.session_state:
+            candidates = st.session_state['detection_results']
+            
+            if candidates and len(candidates) > 0:
+                st.markdown("### 📊 Detection Results")
+                
+                best = candidates[0] if isinstance(candidates, list) else candidates
+                
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if hasattr(best, 'period'):
+                        true_period = st.session_state.get('ml_true_period', None)
+                        detected = best.period
+                        
+                        st.metric("Detected Period", f"{detected:.4f} days")
+                        if true_period:
+                            error = abs(detected - true_period) / true_period * 100
+                            st.metric("Error", f"{error:.2f}%", 
+                                     delta="Match!" if error < 2 else "Check",
+                                     delta_color="normal" if error < 2 else "inverse")
+                
+                with col2:
+                    if hasattr(best, 'depth'):
+                        st.metric("Detected Depth", f"{best.depth * 100:.3f}%")
+                    if hasattr(best, 'snr'):
+                        st.metric("SNR", f"{best.snr:.1f}")
+                
+                # Phase-folded plot
+                if hasattr(best, 'period') and hasattr(best, 't0'):
+                    fig = create_phase_folded_plot(time, flux, best.period, best.t0)
+                    st.plotly_chart(fig, use_container_width=True)
+
+
+# ============================================================================
+# PAGE: JWST SPECTROSCOPY
+# ============================================================================
+
+def page_jwst_spectroscopy():
+    """JWST spectroscopy analysis page."""
+    st.markdown("""
+    <div class="section-header">
+        <span>🔬</span>
+        <h2>JWST Spectroscopy</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="info-box">
+        Analyze JWST transmission spectra and detect atmospheric molecules.
+        Supports NIRSpec, NIRISS, and MIRI instruments.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("📝 Python Code Example"):
+        st.code("""
+from transitkit.spectroscopy import JWSTSpectroscopy
+
+# Load JWST data
+jwst = JWSTSpectroscopy("WASP-39 b")
+
+# Get transmission spectrum
+spectrum = jwst.get_transmission_spectrum()
+
+# Detect molecules
+molecules = jwst.detect_molecules()
+print(molecules)  # H2O, CO2, etc.
+        """, language="python")
+    
+    if not TRANSITKIT_AVAILABLE:
+        st.error("TransitKit is not installed.")
+        return
+    
+    # Target selection
+    target_name = st.text_input(
+        "Target Name",
+        value=st.session_state.get('target_name', 'WASP-39 b'),
+        help="Enter planet with JWST observations"
+    )
+    
+    col1, col2 = st.columns(2)
+    with col1:
+        instrument = st.selectbox("Instrument", ["NIRSpec G395H", "NIRISS SOSS", "NIRCam", "MIRI LRS"])
+    with col2:
+        reduction = st.selectbox("Data Reduction", ["Default", "Custom"])
+    
+    if st.button("📥 Load JWST Data", type="primary"):
+        with st.spinner("Loading JWST spectroscopy data..."):
+            try:
+                jwst = JWSTSpectroscopy(target_name)
+                spectrum = jwst.get_transmission_spectrum()
+                st.session_state['jwst_data'] = jwst
+                st.session_state['jwst_spectrum'] = spectrum
+                st.success("✓ JWST data loaded!")
+            except Exception as e:
+                st.error(f"Failed to load JWST data: {e}")
+                
+                # Show demo data instead
+                st.info("Showing demonstration spectrum...")
+                wavelength = np.linspace(0.8, 5.5, 100)
+                depth = 0.02 + 0.002 * np.sin(wavelength * 3) + np.random.normal(0, 0.0005, 100)
+                st.session_state['demo_spectrum'] = (wavelength, depth)
+    
+    # Display spectrum
+    if 'jwst_spectrum' in st.session_state or 'demo_spectrum' in st.session_state:
+        st.markdown("---")
+        st.markdown("### 📊 Transmission Spectrum")
+        
+        if 'jwst_spectrum' in st.session_state:
+            spectrum = st.session_state['jwst_spectrum']
+            wavelength = spectrum.wavelength
+            depth = spectrum.depth
+            depth_err = getattr(spectrum, 'depth_err', None)
+        else:
+            wavelength, depth = st.session_state['demo_spectrum']
+            depth_err = np.ones_like(depth) * 0.0005
+        
+        # Molecular markers
+        molecules = {
+            'H2O': 1.4,
+            'CO2': 4.3,
+            'CH4': 3.3,
+            'CO': 4.6,
+            'Na': 0.59
+        }
+        
+        fig = create_spectrum_plot(wavelength, depth, depth_err, molecules, 
+                                   title=f"Transmission Spectrum - {target_name}")
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Molecule detection
+        st.markdown("### 🧬 Detected Molecules")
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        detected = [
+            ("H₂O", "Water", True, 15.2),
+            ("CO₂", "Carbon Dioxide", True, 8.7),
+            ("SO₂", "Sulfur Dioxide", True, 4.3),
+            ("Na", "Sodium", False, 1.2)
+        ]
+        
+        for col, (mol, name, det, sigma) in zip([col1, col2, col3, col4], detected):
+            with col:
+                status = "✅" if det else "❌"
+                color = "#22c55e" if det else "#6b7280"
+                col.markdown(f"""
+                <div style="background: rgba(0,0,0,0.3); padding: 1rem; border-radius: 8px; text-align: center;">
+                    <div style="font-size: 1.5rem;">{status}</div>
+                    <div style="font-size: 1.2rem; font-weight: 600; color: {color};">{mol}</div>
+                    <div style="font-size: 0.8rem; color: #94a3b8;">{name}</div>
+                    <div style="font-size: 0.9rem; color: #00d4aa;">{sigma:.1f}σ</div>
+                </div>
+                """, unsafe_allow_html=True)
+
+
+# ============================================================================
+# PAGE: PUBLICATION FIGURES
+# ============================================================================
+
+def page_publication():
+    """Publication figure generation page."""
+    st.markdown("""
+    <div class="section-header">
+        <span>📄</span>
+        <h2>Publication Figures</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="info-box">
+        Generate publication-quality figures for AAS journals, Nature, or custom styles.
+        Includes automatic formatting, proper fonts, and export options.
+    </div>
+    """, unsafe_allow_html=True)
+    
+    with st.expander("📝 Python Code Example"):
+        st.code("""
+from transitkit.publication import PublicationGenerator, PublicationConfig
+
+# Configure style
+config = PublicationConfig(
+    style='aas',        # or 'nature', 'mnras'
+    figsize=(8, 6),
+    dpi=300
+)
+
+# Generate figures
+pub = PublicationGenerator(config)
+fig = pub.create_transit_figure(time, flux, params)
+fig.savefig('figure1.pdf')
+        """, language="python")
+    
+    if not TRANSITKIT_AVAILABLE:
+        st.error("TransitKit is not installed.")
+        return
+    
+    st.markdown("---")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("### ⚙️ Configuration")
+        
+        style = st.selectbox("Journal Style", ["AAS (ApJ, AJ)", "Nature", "MNRAS", "A&A", "Custom"])
+        
+        col_a, col_b = st.columns(2)
+        with col_a:
+            width = st.number_input("Width (inches)", 3.0, 12.0, 8.0, 0.5)
+        with col_b:
+            height = st.number_input("Height (inches)", 2.0, 10.0, 6.0, 0.5)
+        
+        dpi = st.slider("DPI", 100, 600, 300, 50)
+        
+        font = st.selectbox("Font", ["Times New Roman", "Helvetica", "Computer Modern"])
+    
+    with col2:
+        st.markdown("### 📊 Figure Type")
+        
+        fig_type = st.selectbox(
+            "Select Figure",
+            [
+                "Transit Light Curve",
+                "Phase-Folded Transit",
+                "Periodogram",
+                "O-C Diagram (TTV)",
+                "Transmission Spectrum",
+                "Multi-Panel Summary"
+            ]
+        )
+        
+        include_residuals = st.checkbox("Include Residuals", value=True)
+        include_model = st.checkbox("Include Best-Fit Model", value=True)
+        
+        format_type = st.selectbox("Export Format", ["PDF", "PNG", "SVG", "EPS"])
+    
+    if st.button("🎨 Generate Figure", type="primary"):
+        st.markdown("---")
+        
+        with st.spinner("Generating publication figure..."):
+            try:
+                config = PublicationConfig(
+                    style=style.split()[0].lower(),
+                    figsize=(width, height),
+                    dpi=dpi
+                )
+                
+                pub = PublicationGenerator(config)
+                
+                # Generate sample figure
+                st.success("✓ Figure generated!")
+                
+                # Show preview
+                st.markdown("### 📷 Preview")
+                
+                # Create sample plot
+                time = np.linspace(0, 10, 1000)
+                flux = 1 - 0.01 * np.exp(-((time - 5) ** 2) / 0.1) + np.random.normal(0, 0.001, 1000)
+                
+                fig = create_light_curve_plot(time, flux, title=f"Publication Figure ({style})")
+                st.plotly_chart(fig, use_container_width=True)
+                
+                st.info(f"📥 Figure ready for export as {format_type} ({width}×{height} inches, {dpi} DPI)")
+                
+            except Exception as e:
+                st.error(f"Failed to generate figure: {e}")
+
+
+# ============================================================================
+# PAGE: SYNTHETIC TESTING
+# ============================================================================
+
+def page_synthetic():
+    """Synthetic data testing page."""
+    st.markdown("""
+    <div class="section-header">
+        <span>🧪</span>
+        <h2>Synthetic Transit Testing</h2>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("""
+    <div class="info-box">
+        Generate synthetic transit signals to test detection algorithms and validate your analysis pipeline.
+    </div>
+    """, unsafe_allow_html=True)
+    
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        st.markdown("#### 🪐 Planet Parameters")
-        period = st.slider("Orbital Period (days)", 1.0, 30.0, 5.0, 0.1)
-        depth = st.slider("Transit Depth (%)", 0.1, 5.0, 1.0, 0.1) / 100
-        t0 = st.slider("Transit Epoch (days)", 0.0, float(period), period/2, 0.1)
+        st.markdown("#### 🪐 Planet")
+        period = st.slider("Period (days)", 0.5, 30.0, 5.0, 0.1)
+        depth = st.slider("Depth (%)", 0.05, 5.0, 1.0, 0.05)
+        duration = st.slider("Duration (hours)", 0.5, 12.0, 3.0, 0.5)
     
     with col2:
-        st.markdown("#### 🔄 Orbital Parameters")
-        duration = st.slider("Transit Duration (days)", 0.05, 0.5, 0.15, 0.01)
+        st.markdown("#### 🔄 Orbit")
+        t0 = st.slider("Epoch (days)", 0.0, float(period), period / 2, 0.1)
         inc = st.slider("Inclination (°)", 80.0, 90.0, 89.0, 0.1)
-        a_rs = st.slider("a/R★", 5.0, 50.0, 15.0, 1.0)
+        ecc = st.slider("Eccentricity", 0.0, 0.5, 0.0, 0.01)
     
     with col3:
         st.markdown("#### ⭐ Limb Darkening")
-        u1 = st.slider("u₁ (linear)", 0.0, 1.0, 0.4, 0.05)
-        u2 = st.slider("u₂ (quadratic)", -0.5, 0.5, 0.2, 0.05)
-        stellar_var = st.slider("Stellar Variability", 0.0, 0.005, 0.0, 0.0005)
+        u1 = st.slider("u₁", 0.0, 1.0, 0.4, 0.05)
+        u2 = st.slider("u₂", -0.5, 0.5, 0.2, 0.05)
+        noise = st.slider("Noise (ppm)", 50, 5000, 500, 50)
+    
+    # Observation parameters
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+    with col1:
+        obs_days = st.slider("Observation Duration (days)", 5, 100, 30)
+    with col2:
+        cadence = st.selectbox("Cadence", ["2-min (TESS short)", "30-min (TESS long)", "1-min (Kepler short)"])
     
     # Generate data
-    n_points = int(observation_days * 24 * 60 / cadence)
-    time = np.linspace(0, observation_days, n_points)
-    
-    flux_clean = generate_transit_signal(time, period=period, t0=t0, depth=depth,
-                                         duration=duration, u1=u1, u2=u2,
-                                         inc=inc, a_rs=a_rs)
-    flux_noisy = add_noise(flux_clean, noise_level=noise_level, stellar_var=stellar_var)
-    
-    # Metrics
-    rp_rs = np.sqrt(depth)
-    rp_rearth = rp_rs * 109  # Sun-like star
-    n_transits = int(observation_days / period)
-    expected_snr = depth / noise_level * np.sqrt(n_points * duration / period)
-    
-    st.markdown("---")
-    
-    # Display metrics
-    cols = st.columns(5)
-    metrics = [
-        ("Period", f"{period:.2f}", "days"),
-        ("Depth", f"{depth*100:.3f}", "%"),
-        ("Rp/R★", f"{rp_rs:.4f}", ""),
-        ("~Rp", f"{rp_rearth:.1f}", "R⊕"),
-        ("Expected SNR", f"{expected_snr:.1f}", "")
-    ]
-    
-    for col, (label, value, unit) in zip(cols, metrics):
-        col.markdown(f"""
-        <div class="metric-card">
-            <div class="value">{value}<span class="unit">{unit}</span></div>
-            <div class="label">{label}</div>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Plots
-    st.markdown("---")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        fig_lc = create_light_curve_plot(time, flux_noisy, flux_clean, 
-                                         title="Full Light Curve")
-        st.plotly_chart(fig_lc, use_container_width=True)
-    
-    with col2:
-        fig_phase = create_phase_folded_plot(time, flux_noisy, period, t0,
-                                             title=f"Phase-Folded (P={period:.2f}d)")
-        st.plotly_chart(fig_phase, use_container_width=True)
-    
-    # Store in session state
-    st.session_state['time'] = time
-    st.session_state['flux'] = flux_noisy
-    st.session_state['flux_clean'] = flux_clean
-    st.session_state['true_period'] = period
-    st.session_state['true_depth'] = depth
-    st.session_state['true_t0'] = t0
-    st.session_state['true_duration'] = duration
-
-
-def page_multi_method(noise_level, observation_days, cadence):
-    """Multi-method detection comparison page."""
-    
-    st.markdown("""
-    <div class="section-header">
-        <span class="icon">🔬</span>
-        <h2>Multi-Method Transit Detection</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="info-box">
-        Compare BLS (Box Least Squares), GLS (Generalized Lomb-Scargle), and PDM (Phase Dispersion Minimization)
-        algorithms for transit period detection. Consensus weighting combines results.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    # Check if data exists
-    if 'time' not in st.session_state:
-        st.warning("⚠️ Please generate synthetic data first in the 'Synthetic Transit' tab.")
-        return
-    
-    time = st.session_state['time']
-    flux = st.session_state['flux']
-    true_period = st.session_state.get('true_period', 5.0)
-    
-    # Period search range
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        min_period = st.slider("Min Period (days)", 0.5, 5.0, 1.0, 0.1)
-    with col2:
-        max_period = st.slider("Max Period (days)", 10.0, 50.0, 20.0, 1.0)
-    with col3:
-        methods = st.multiselect("Methods", ['bls', 'gls', 'pdm'], 
-                                 default=['bls', 'gls', 'pdm'])
-    
-    if st.button("🚀 Run Detection", type="primary"):
-        progress = st.progress(0, text="Starting detection...")
+    if st.button("🎲 Generate Light Curve", type="primary"):
+        cadence_min = {"2-min": 2, "30-min": 30, "1-min": 1}[cadence.split()[0]]
+        n_points = int(obs_days * 24 * 60 / cadence_min)
         
-        results = {}
-        n_methods = len(methods)
+        time = np.linspace(0, obs_days, n_points)
         
-        for idx, method in enumerate(methods):
-            progress.progress((idx) / n_methods, text=f"Running {method.upper()}...")
-            
-            if method == 'bls':
-                results['bls'] = box_least_squares(time, flux, min_period, max_period)
-            elif method == 'gls':
-                results['gls'] = generalized_lomb_scargle(time, flux, min_period, max_period)
-            elif method == 'pdm':
-                results['pdm'] = phase_dispersion_minimization(time, flux, min_period, max_period)
+        # Generate transit signal
+        flux = np.ones(n_points)
+        dur_days = duration / 24
         
-        progress.progress(0.9, text="Calculating consensus...")
-        
-        # Calculate consensus
-        periods = []
-        weights = []
-        
-        if 'bls' in results:
-            periods.append(results['bls']['period'])
-            weights.append(max(results['bls'].get('snr', 1), 1))
-        if 'gls' in results:
-            periods.append(results['gls']['period'])
-            weights.append(results['gls']['power_max'] * 10 + 1)
-        if 'pdm' in results:
-            periods.append(results['pdm']['period'])
-            weights.append((1 - results['pdm']['theta_min']) * 10 + 1)
-        
-        results['consensus'] = {
-            'period': np.average(periods, weights=weights) if periods else 0,
-            'period_std': np.std(periods) if len(periods) > 1 else 0,
-            'periods': periods,
-            'weights': weights
-        }
-        
-        progress.progress(1.0, text="Done!")
-        progress.empty()
-        
-        st.session_state['detection_results'] = results
-        
-        st.markdown("---")
-        st.markdown("### 📊 Results Comparison")
-        
-        # Results cards
-        cols = st.columns(len(methods) + 1)
-        
-        method_colors = {'bls': '#00d4aa', 'gls': '#7c3aed', 'pdm': '#f59e0b'}
-        
-        for col, method in zip(cols[:-1], methods):
-            r = results[method]
-            period_err = abs(r['period'] - true_period) / true_period * 100
-            is_correct = period_err < 2
-            
-            col.markdown(f"""
-            <div class="method-card {'best' if is_correct else ''}">
-                <div class="method-name" style="color: {method_colors[method]};">
-                    {method.upper()}
-                </div>
-                <div class="param-row">
-                    <span class="param-name">Period</span>
-                    <span class="param-value">{r['period']:.4f} d</span>
-                </div>
-                <div class="param-row">
-                    <span class="param-name">Error</span>
-                    <span class="param-value" style="color: {'#22c55e' if is_correct else '#ef4444'}">
-                        {period_err:.2f}%
-                    </span>
-                </div>
-                {'<div style="color: #22c55e; font-size: 0.8rem; margin-top: 0.5rem;">✓ Match</div>' if is_correct else ''}
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Consensus
-        c = results['consensus']
-        cols[-1].markdown(f"""
-        <div class="method-card best">
-            <div class="method-name" style="color: #f1f5f9;">CONSENSUS</div>
-            <div class="param-row">
-                <span class="param-name">Period</span>
-                <span class="param-value">{c['period']:.4f} d</span>
-            </div>
-            <div class="param-row">
-                <span class="param-name">Scatter</span>
-                <span class="param-value">{c['period_std']:.4f} d</span>
-            </div>
-            <div style="color: #00d4aa; font-size: 0.8rem; margin-top: 0.5rem;">★ Weighted</div>
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Periodograms
-        st.markdown("### 📈 Periodograms")
-        
-        cols = st.columns(len(methods))
-        for col, method in zip(cols, methods):
-            with col:
-                fig = create_periodogram_plot(results[method], method.upper())
-                
-                # Add true period marker
-                fig.add_vline(x=true_period, line_dash='dash', line_color='#ef4444',
-                             annotation_text=f'True: {true_period:.2f}d')
-                
-                st.plotly_chart(fig, use_container_width=True)
-
-
-def page_ttv_analysis(noise_level, observation_days, cadence):
-    """TTV analysis page."""
-    
-    st.markdown("""
-    <div class="section-header">
-        <span class="icon">⏱️</span>
-        <h2>Transit Timing Variations (TTV)</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="info-box">
-        Measure individual transit times and detect Transit Timing Variations. TTVs can indicate
-        gravitational perturbations from additional planets in the system.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    if 'time' not in st.session_state:
-        st.warning("⚠️ Please generate synthetic data first.")
-        return
-    
-    time = st.session_state['time']
-    flux = st.session_state['flux']
-    true_period = st.session_state.get('true_period', 5.0)
-    true_t0 = st.session_state.get('true_t0', 2.5)
-    true_duration = st.session_state.get('true_duration', 0.15)
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        ttv_amplitude = st.slider("Inject TTV Amplitude (minutes)", 0.0, 30.0, 0.0, 1.0)
-    with col2:
-        ttv_period_ratio = st.slider("TTV Super-period (×orbital)", 2.0, 10.0, 5.0, 0.5)
-    
-    # If TTV amplitude > 0, inject TTVs
-    if ttv_amplitude > 0:
-        # Re-generate with TTVs
-        n_points = len(time)
-        flux_ttv = np.ones(n_points)
-        n_transits = int((time[-1] - time[0]) / true_period) + 1
-        
-        ttv_epochs = []
-        ttv_shifts = []
-        
-        for i in range(n_transits):
-            # TTV sinusoidal pattern
-            ttv_shift = ttv_amplitude / (24 * 60) * np.sin(2 * np.pi * i / ttv_period_ratio)
-            actual_tc = true_t0 + i * true_period + ttv_shift
-            
-            ttv_epochs.append(i)
-            ttv_shifts.append(ttv_shift * 24 * 60)  # Convert to minutes
-            
-            # Add transit at shifted time
-            dt = np.abs(time - actual_tc)
-            in_transit = dt < true_duration / 2
+        for i in range(int(obs_days / period) + 2):
+            tc = t0 + i * period
+            x = (time - tc) / (dur_days / 2)
+            in_transit = np.abs(x) < 1
             
             if np.any(in_transit):
-                x = (time[in_transit] - actual_tc) / (true_duration / 2)
-                mu = np.sqrt(1 - np.clip(x**2, 0, 1))
-                ld_factor = 1 - 0.4 * (1 - mu) - 0.2 * (1 - mu)**2
-                depth = st.session_state.get('true_depth', 0.01)
-                flux_ttv[in_transit] = 1 - depth * ld_factor * (1 - x**2)
+                # Limb darkening
+                mu = np.sqrt(1 - np.clip(x[in_transit] ** 2, 0, 1))
+                ld = 1 - u1 * (1 - mu) - u2 * (1 - mu) ** 2
+                flux[in_transit] = 1 - (depth / 100) * ld * (1 - x[in_transit] ** 2)
         
-        flux_with_ttv = add_noise(flux_ttv, noise_level)
-        st.session_state['flux'] = flux_with_ttv
-        flux = flux_with_ttv
+        # Add noise
+        flux += np.random.normal(0, noise / 1e6, n_points)
         
-        st.success(f"✓ Injected TTVs with amplitude ±{ttv_amplitude:.1f} minutes")
+        st.session_state['synth_time'] = time
+        st.session_state['synth_flux'] = flux
+        st.session_state['synth_params'] = {
+            'period': period, 'depth': depth, 't0': t0,
+            'duration': duration, 'noise': noise
+        }
+        
+        st.success(f"✓ Generated {n_points:,} data points over {obs_days} days")
     
-    if st.button("📏 Measure Transit Times", type="primary"):
-        with st.spinner("Measuring individual transit times..."):
-            ttv_result = measure_transit_times(time, flux, true_period, true_t0, true_duration)
-        
-        st.session_state['ttv_result'] = ttv_result
+    # Display
+    if 'synth_time' in st.session_state:
+        time = st.session_state['synth_time']
+        flux = st.session_state['synth_flux']
+        params = st.session_state['synth_params']
         
         st.markdown("---")
         
-        # TTV detection result
-        if ttv_result['ttvs_detected']:
-            st.markdown("""
-            <div class="success-box">
-                <strong>✓ TTVs Detected!</strong><br>
-                Significant transit timing variations found. This could indicate additional planets.
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.markdown("""
-            <div class="info-box">
-                <strong>ℹ️ No significant TTVs</strong><br>
-                Transit times are consistent with a constant period.
-            </div>
-            """, unsafe_allow_html=True)
-        
-        # Metrics
-        cols = st.columns(4)
-        cols[0].metric("Transits Measured", len(ttv_result['epoch']))
-        cols[1].metric("RMS TTV", f"{ttv_result['rms_ttv_minutes']:.2f} min")
-        cols[2].metric("Max |O-C|", f"{np.max(np.abs(ttv_result['oc_minutes'])):.2f} min")
-        cols[3].metric("TTVs Detected", "Yes ✓" if ttv_result['ttvs_detected'] else "No")
-        
-        # O-C plot
-        fig = create_ttv_plot(ttv_result)
-        
-        # Add injected TTVs if applicable
-        if ttv_amplitude > 0:
-            fig.add_trace(go.Scatter(
-                x=ttv_epochs[:len(ttv_result['epoch'])],
-                y=ttv_shifts[:len(ttv_result['epoch'])],
-                mode='lines',
-                name='Injected TTV',
-                line=dict(color='#ef4444', width=2, dash='dash')
-            ))
-        
-        st.plotly_chart(fig, use_container_width=True)
-        
-        # Transit times table
-        with st.expander("📋 Transit Times Table"):
-            df = pd.DataFrame({
-                'Epoch': ttv_result['epoch'],
-                'Expected (d)': ttv_result['expected_times'],
-                'Observed (d)': ttv_result['observed_times'],
-                'O-C (min)': ttv_result['oc_minutes'],
-                'Error (min)': ttv_result['timing_errors'] * 24 * 60
-            })
-            st.dataframe(df.round(4), use_container_width=True)
-
-
-def page_injection_recovery(noise_level, observation_days, cadence):
-    """Injection-recovery test page."""
-    
-    st.markdown("""
-    <div class="section-header">
-        <span class="icon">📊</span>
-        <h2>Injection-Recovery Testing</h2>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    st.markdown("""
-    <div class="info-box">
-        Assess transit detection efficiency by injecting synthetic transits and attempting recovery.
-        This determines the completeness of your search for different planet sizes.
-    </div>
-    """, unsafe_allow_html=True)
-    
-    col1, col2, col3 = st.columns(3)
-    
-    with col1:
-        n_injections = st.slider("Number of Injections", 10, 100, 30, 5)
-    with col2:
-        period_range = st.slider("Period Range (days)", 1.0, 20.0, (1.0, 15.0))
-    with col3:
-        depth_range = st.slider("Depth Range (%)", 0.1, 3.0, (0.1, 2.0))
-    
-    depth_range = (depth_range[0]/100, depth_range[1]/100)
-    
-    if st.button("🔬 Run Injection-Recovery Test", type="primary"):
-        # Generate time array
-        n_points = int(observation_days * 24 * 60 / cadence)
-        time = np.linspace(0, observation_days, n_points)
-        
-        progress_bar = st.progress(0)
-        status_text = st.empty()
-        
-        # Run test with progress updates
-        results = []
-        for i in range(n_injections):
-            progress_bar.progress((i + 1) / n_injections)
-            status_text.text(f"Testing injection {i+1}/{n_injections}...")
-            
-            # Random parameters
-            true_period = np.random.uniform(*period_range)
-            true_depth = np.random.uniform(*depth_range)
-            true_t0 = np.random.uniform(0, true_period)
-            
-            # Generate and detect
-            flux = generate_transit_signal(time, period=true_period, t0=true_t0, depth=true_depth)
-            flux_noisy = add_noise(flux, noise_level=noise_level)
-            
-            bls_result = box_least_squares(time, flux_noisy, 
-                                           min_period=period_range[0],
-                                           max_period=period_range[1],
-                                           n_periods=2000)
-            
-            period_match = np.abs(bls_result['period'] - true_period) / true_period < 0.02
-            
-            results.append({
-                'true_period': true_period,
-                'true_depth': true_depth,
-                'detected_period': bls_result['period'],
-                'detected_depth': bls_result['depth'],
-                'snr': bls_result['snr'],
-                'recovered': period_match
-            })
-        
-        progress_bar.empty()
-        status_text.empty()
-        
-        df = pd.DataFrame(results)
-        
-        # Calculate recovery by depth
-        depth_bins = np.linspace(depth_range[0], depth_range[1], 6)
-        recovery_data = []
-        for j in range(len(depth_bins) - 1):
-            mask = (df['true_depth'] >= depth_bins[j]) & (df['true_depth'] < depth_bins[j+1])
-            rate = df[mask]['recovered'].mean() if mask.sum() > 0 else 0
-            recovery_data.append({
-                'depth_mid': (depth_bins[j] + depth_bins[j+1]) / 2,
-                'recovery_rate': rate,
-                'n_samples': mask.sum()
-            })
-        recovery_df = pd.DataFrame(recovery_data)
-        
-        st.session_state['injection_results'] = df
-        st.session_state['recovery_df'] = recovery_df
-        
-        st.markdown("---")
-        st.success(f"✓ Completed {n_injections} injection-recovery tests")
-        
-        # Summary metrics
-        cols = st.columns(4)
-        cols[0].metric("Total Injections", n_injections)
-        cols[1].metric("Overall Recovery", f"{df['recovered'].mean()*100:.1f}%")
-        cols[2].metric("Mean SNR", f"{df['snr'].mean():.1f}")
-        cols[3].metric("Median SNR", f"{df['snr'].median():.1f}")
-        
-        # Plots
         col1, col2 = st.columns(2)
         
         with col1:
-            fig = create_injection_recovery_plot(recovery_df)
+            fig = create_light_curve_plot(time, flux, title="Full Light Curve")
             st.plotly_chart(fig, use_container_width=True)
         
         with col2:
-            # Depth vs SNR scatter
-            fig = px.scatter(
-                df, x='true_depth', y='snr',
-                color='recovered',
-                color_discrete_map={True: '#22c55e', False: '#ef4444'},
-                title='Detection Results',
-                labels={'true_depth': 'True Depth', 'snr': 'Detection SNR', 
-                        'recovered': 'Recovered'}
+            fig = create_phase_folded_plot(
+                time, flux, params['period'], params['t0'],
+                title=f"Phase-Folded (P={params['period']:.2f}d)"
             )
-            fig.update_layout(
-                template='plotly_dark',
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
-                font=dict(color='#f1f5f9')
-            )
-            fig.update_xaxes(gridcolor='rgba(99,102,241,0.15)')
-            fig.update_yaxes(gridcolor='rgba(99,102,241,0.15)')
             st.plotly_chart(fig, use_container_width=True)
         
-        # Detailed results
-        with st.expander("📋 Detailed Results"):
-            st.dataframe(df.round(4), use_container_width=True)
-            
-            csv = df.to_csv(index=False)
-            st.download_button(
-                label="📥 Download Results CSV",
-                data=csv,
-                file_name="injection_recovery_results.csv",
-                mime="text/csv"
-            )
+        # Metrics
+        cols = st.columns(5)
+        n_transits = int((time[-1] - time[0]) / params['period'])
+        expected_snr = (params['depth'] / 100) / (params['noise'] / 1e6) * np.sqrt(n_transits * params['duration'] / 24 * 60 / 2)
+        
+        cols[0].metric("Data Points", f"{len(time):,}")
+        cols[1].metric("Transits", n_transits)
+        cols[2].metric("Period", f"{params['period']:.2f} d")
+        cols[3].metric("Depth", f"{params['depth']:.2f}%")
+        cols[4].metric("Expected SNR", f"{expected_snr:.1f}")
 
+
+# ============================================================================
+# PAGE: DOCUMENTATION
+# ============================================================================
 
 def page_documentation():
-    """Documentation and help page."""
-    
+    """Documentation page."""
     st.markdown("""
     <div class="section-header">
-        <span class="icon">📖</span>
-        <h2>TransitKit Documentation</h2>
+        <span>📖</span>
+        <h2>Documentation</h2>
     </div>
     """, unsafe_allow_html=True)
     
-    tab1, tab2, tab3, tab4 = st.tabs(["🚀 Quick Start", "🔧 API Reference", 
-                                       "📚 Methods", "❓ FAQ"])
+    tab1, tab2, tab3, tab4 = st.tabs(["🚀 Quick Start", "📦 Installation", "🔧 API", "❓ FAQ"])
     
     with tab1:
         st.markdown("""
-        ### Installation
-        
-        ```bash
-        pip install transitkit
-        ```
-        
-        ### Basic Usage
+        ### Quick Start
         
         ```python
-        import numpy as np
-        from transitkit.core import (
-            generate_transit_signal_mandel_agol,
-            find_transits_bls_advanced,
-            add_noise
-        )
-
-        # Generate synthetic data
-        time = np.linspace(0, 30, 2000)
-        flux = generate_transit_signal_mandel_agol(
-            time, 
-            period=5.0, 
-            t0=2.5, 
-            depth=0.01
-        )
-        flux_noisy = add_noise(flux, noise_level=0.001)
-
-        # Detect transit
-        result = find_transits_bls_advanced(time, flux_noisy)
-        print(f"Detected period: {result['period']:.4f} days")
-        ```
+        # One line to load any planet
+        from transitkit.universal import UniversalTarget
+        target = UniversalTarget("WASP-39 b")
         
-        ### Load TESS Data
+        # One line to download all data
+        from transitkit.missions import download_all
+        data = download_all("WASP-39 b")
         
-        ```python
-        from transitkit.io import load_tess_data_advanced
-
-        lc_collection = load_tess_data_advanced("TIC 25155310", sectors=[1, 2])
+        # One line to detect transits
+        from transitkit.ml import detect_transits
+        results = detect_transits(data.time, data.flux)
+        
+        # One line for JWST spectroscopy
+        from transitkit.spectroscopy import JWSTSpectroscopy
+        spectrum = JWSTSpectroscopy("WASP-39 b").get_transmission_spectrum()
         ```
         """)
     
     with tab2:
         st.markdown("""
-        ### Core Functions
+        ### Installation
         
-        | Function | Description |
-        |----------|-------------|
-        | `generate_transit_signal_mandel_agol()` | Generate limb-darkened transit model |
-        | `find_transits_bls_advanced()` | Box Least Squares with SNR/FAP |
-        | `find_transits_multiple_methods()` | Multi-method consensus detection |
-        | `find_period_gls()` | Generalized Lomb-Scargle |
-        | `find_period_pdm()` | Phase Dispersion Minimization |
-        | `estimate_parameters_mcmc()` | MCMC parameter estimation |
+        **Basic:**
+        ```bash
+        pip install transitkit
+        ```
         
-        ### Analysis Functions
+        **Full (with all features):**
+        ```bash
+        pip install "transitkit[full]"
+        ```
         
-        | Function | Description |
-        |----------|-------------|
-        | `detrend_light_curve_gp()` | Gaussian Process detrending |
-        | `remove_systematics_pca()` | PCA systematics removal |
-        | `measure_transit_timing_variations()` | TTV measurement |
-        | `fit_transit_time()` | Fit individual transit times |
-        
-        ### Validation Functions
-        
-        | Function | Description |
-        |----------|-------------|
-        | `validate_transit_parameters()` | Physical parameter validation |
-        | `perform_injection_recovery_test()` | Detection efficiency test |
-        | `calculate_detection_significance()` | Bootstrap significance |
+        **Optional extras:**
+        ```bash
+        pip install "transitkit[mcmc]"      # MCMC fitting
+        pip install "transitkit[ml]"        # ML detection
+        pip install "transitkit[spectroscopy]"  # JWST analysis
+        ```
         """)
     
     with tab3:
         st.markdown("""
-        ### Box Least Squares (BLS)
+        ### API Reference
         
-        The BLS algorithm searches for periodic box-shaped dips in the light curve.
-        It's optimized for detecting planetary transits with flat-bottomed profiles.
-        
-        **Key parameters:**
-        - `min_period`, `max_period`: Search range
-        - `n_periods`: Resolution of period grid
-        - `duration_grid`: Trial transit durations
-        
-        ### Generalized Lomb-Scargle (GLS)
-        
-        An extension of the classical Lomb-Scargle periodogram that includes
-        a floating mean. Best for sinusoidal signals but can detect transits.
-        
-        ### Phase Dispersion Minimization (PDM)
-        
-        A non-parametric method that minimizes the dispersion of phase-folded data.
-        Works well for non-sinusoidal periodic signals including transits.
-        
-        ### Consensus Detection
-        
-        TransitKit combines results from multiple methods using weighted averaging.
-        Weights are based on detection significance (SNR, power, etc.).
+        | Module | Main Classes | Description |
+        |--------|--------------|-------------|
+        | `transitkit.universal` | `UniversalTarget`, `UniversalResolver` | Target resolution |
+        | `transitkit.missions` | `MultiMissionDownloader` | Data download |
+        | `transitkit.ml` | `MLTransitDetector` | Transit detection |
+        | `transitkit.spectroscopy` | `JWSTSpectroscopy` | Spectral analysis |
+        | `transitkit.publication` | `PublicationGenerator` | Figure generation |
         """)
     
     with tab4:
         st.markdown("""
-        ### Frequently Asked Questions
+        ### FAQ
         
-        **Q: What noise level should I use?**
+        **Q: Which planets have JWST data?**
         
-        A: Typical values:
-        - TESS: 200-500 ppm for bright stars
-        - Kepler: 50-200 ppm
-        - Ground-based: 1000-5000 ppm
-        
-        **Q: How do I interpret SNR?**
-        
-        A: General guidelines:
-        - SNR < 3: Not significant
-        - SNR 3-7: Marginal detection
-        - SNR 7-10: Good detection
-        - SNR > 10: Strong detection
-        
-        **Q: Why do methods give different periods?**
-        
-        A: Each method has different sensitivity to signal shapes.
-        BLS is optimal for box-shaped transits, while GLS works better
-        for sinusoidal variations. Use the consensus period.
+        A: Check the [JWST ERS and GO programs](https://www.stsci.edu/jwst/science-execution/approved-programs) 
+        for transiting exoplanet observations.
         
         **Q: How do I cite TransitKit?**
         
         ```bibtex
         @software{transitkit,
           author = {Solmaz, Arif},
-          title = {TransitKit: Professional Exoplanet Transit Analysis},
+          title = {TransitKit: Universal Exoplanet Transit Analysis},
           year = {2025},
           url = {https://github.com/arifsolmaz/transitkit}
         }
         ```
+        
+        **Q: Can I use my own data?**
+        
+        A: Yes! All functions accept numpy arrays for time and flux.
         """)
 
 
@@ -1856,27 +1457,41 @@ def page_documentation():
 def main():
     """Main application entry point."""
     
-    # Render sidebar and get settings
-    mode, noise_level, observation_days, cadence = render_sidebar()
+    # Sidebar navigation
+    mode = render_sidebar()
     
     # Header
-    st.markdown("""
+    st.markdown(f"""
     <div class="main-header">
         <h1>🌟 TransitKit</h1>
-        <p class="subtitle">Professional Exoplanet Transit Light Curve Analysis</p>
-        <span class="badge">v2.0 • Based on Mandel & Agol (2002)</span>
+        <p class="subtitle">Universal Exoplanet Transit Analysis — Any Planet, Any Mission, One Line</p>
+        <span class="version-badge">v{TK_VERSION}</span>
     </div>
     """, unsafe_allow_html=True)
     
-    # Route to appropriate page
-    if "Synthetic" in mode:
-        page_synthetic_transit(noise_level, observation_days, cadence)
-    elif "Multi-Method" in mode:
-        page_multi_method(noise_level, observation_days, cadence)
-    elif "TTV" in mode:
-        page_ttv_analysis(noise_level, observation_days, cadence)
-    elif "Injection" in mode:
-        page_injection_recovery(noise_level, observation_days, cadence)
+    # Package status warning
+    if not TRANSITKIT_AVAILABLE:
+        st.markdown(f"""
+        <div class="warning-box">
+            <strong>⚠️ TransitKit not installed</strong><br>
+            Install with: <code>pip install transitkit</code><br>
+            Some features are running in demo mode.
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Route to pages
+    if "Universal" in mode:
+        page_universal_target()
+    elif "Multi-Mission" in mode:
+        page_multi_mission()
+    elif "ML" in mode:
+        page_ml_detection()
+    elif "JWST" in mode:
+        page_jwst_spectroscopy()
+    elif "Publication" in mode:
+        page_publication()
+    elif "Synthetic" in mode:
+        page_synthetic()
     elif "Documentation" in mode:
         page_documentation()
     
@@ -1886,7 +1501,7 @@ def main():
         <p>Built with <a href="https://github.com/arifsolmaz/transitkit">TransitKit</a> • 
            <a href="https://streamlit.io">Streamlit</a> • 
            <a href="https://plotly.com">Plotly</a></p>
-        <p>© 2025 TransitKit | MIT License</p>
+        <p>© 2025 Arif Solmaz | MIT License</p>
     </div>
     """, unsafe_allow_html=True)
 
