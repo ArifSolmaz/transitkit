@@ -3166,7 +3166,9 @@ For updates, bug reports, and contributions:
                 offset += (dt[-1] - dt[0]) + gap
             x = np.concatenate(x_cat)
             y = np.concatenate(y_cat)
-            self.tess_plot.plot_xy(x, y, xlabel="Concatenated time (days)", ylabel="Flux",
+            # Normalize flux to ~1.0 for better visualization
+            y_normalized = y / np.nanmedian(y)
+            self.tess_plot.plot_xy(x, y_normalized, xlabel="Concatenated time (days)", ylabel="Normalized Flux",
                                    title="TESS Concatenated Light Curve", style="k.", alpha=0.6, ms=2)
             return
         
@@ -3177,7 +3179,9 @@ For updates, bug reports, and contributions:
             title = f"TESS Sector {sec} Light Curve"
         else:
             title = "TESS Stitched Light Curve (absolute BTJD)"
-        self.tess_plot.plot_xy(self.tess_time, self.tess_flux, xlabel="Time (BTJD days)", ylabel="Flux",
+        # Normalize flux to ~1.0 for better visualization
+        flux_normalized = self.tess_flux / np.nanmedian(self.tess_flux)
+        self.tess_plot.plot_xy(self.tess_time, flux_normalized, xlabel="Time (BTJD days)", ylabel="Normalized Flux",
                                title=title, style="k.", alpha=0.6, ms=2)
     
     def on_tess_bls(self):
@@ -3300,8 +3304,11 @@ For updates, bug reports, and contributions:
                         phase = (phase + 0.5) % 1.0 - 0.5
                         sort_idx = np.argsort(phase)
                         
-                        self.tess_plot.plot_xy(phase[sort_idx], flux[sort_idx],
-                                              xlabel="Phase", ylabel="Flux",
+                        # Normalize flux to ~1.0 for better visualization
+                        flux_normalized = flux / np.nanmedian(flux)
+                        
+                        self.tess_plot.plot_xy(phase[sort_idx], flux_normalized[sort_idx],
+                                              xlabel="Phase", ylabel="Normalized Flux",
                                               title="Phase-folded Light Curve",
                                               ax_index=1, style='k.', alpha=0.3, ms=1)
                     
@@ -3582,8 +3589,10 @@ For updates, bug reports, and contributions:
                 return
             tt = self.tess_time[m]
             ff = self.tess_flux[m]
+            # Normalize flux to ~1.0 for better visualization
+            ff_normalized = ff / np.nanmedian(ff)
             panel.set_subplots(1)
-            panel.plot_xy(tt, ff, xlabel="Time (BTJD)", ylabel="Flux",
+            panel.plot_xy(tt, ff_normalized, xlabel="Time (BTJD)", ylabel="Normalized Flux",
                           title=f"Transit n={n}  tc={tc:.6f}  window=±{w:.3f} d",
                           style="k.", alpha=0.75, ms=3)
             panel.vline(tc, color="r", alpha=0.35)
@@ -3629,13 +3638,16 @@ For updates, bug reports, and contributions:
         o = np.argsort(x)
         x, y = x[o], y[o]
         
+        # Normalize flux to ~1.0 for better visualization
+        y_normalized = y / np.nanmedian(y)
+        
         win = tk.Toplevel(self)
         win.title("Stacked Transits")
         win.geometry("980x560")
         
         panel = EnhancedPlotPanel(win, title="Stacked")
         panel.pack(fill=tk.BOTH, expand=True)
-        panel.plot_xy(x, y, xlabel="Time from mid-transit (days)", ylabel="Flux",
+        panel.plot_xy(x, y_normalized, xlabel="Time from mid-transit (days)", ylabel="Normalized Flux",
                       title=f"Stacked transits | N={len(events)} | P={P:.9f}",
                       style="k.", alpha=0.35, ms=2)
         panel.vline(0.0, color="r", alpha=0.3)
@@ -3658,12 +3670,15 @@ For updates, bug reports, and contributions:
         ph = ph[o]
         f = self.tess_flux[o]
         
+        # Normalize flux to ~1.0 for better visualization
+        f_normalized = f / np.nanmedian(f)
+        
         win = tk.Toplevel(self)
         win.title("Phase Fold")
         win.geometry("980x560")
         panel = EnhancedPlotPanel(win, title="Phase Fold")
         panel.pack(fill=tk.BOTH, expand=True)
-        panel.plot_xy(ph, f, xlabel="Phase", ylabel="Flux",
+        panel.plot_xy(ph, f_normalized, xlabel="Phase", ylabel="Normalized Flux",
                       title=f"Phase fold | P={P:.9f}", style="k.", alpha=0.25, ms=2)
     
     def on_tess_export(self):
