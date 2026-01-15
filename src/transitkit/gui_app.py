@@ -796,9 +796,54 @@ class TransitKitGUI(tk.Tk):
         self.sim_plot.pack(fill=tk.BOTH, expand=True)
     
     def _build_tess_tab(self):
-        """Build TESS Explorer tab (ORIGINAL)."""
-        left = ttk.Frame(self.tess_tab, padding=10)
-        left.pack(side=tk.LEFT, fill=tk.Y)
+        """Build TESS Explorer tab (ORIGINAL) - with scrollable left panel."""
+        # Create a container for left panel with scrollbar
+        left_container = ttk.Frame(self.tess_tab)
+        left_container.pack(side=tk.LEFT, fill=tk.Y)
+        
+        # Create canvas and scrollbar for scrollable content
+        canvas = tk.Canvas(left_container, width=280, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=canvas.yview)
+        
+        # Scrollable frame inside canvas
+        left = ttk.Frame(canvas, padding=10)
+        
+        # Configure canvas scrolling
+        def configure_scroll(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        left.bind("<Configure>", configure_scroll)
+        
+        canvas_frame = canvas.create_window((0, 0), window=left, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack scrollbar and canvas
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Enable mousewheel scrolling
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def on_mousewheel_linux(event):
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
+        
+        # Bind mousewheel only when hovering over this canvas
+        def bind_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", on_mousewheel)
+            canvas.bind_all("<Button-4>", on_mousewheel_linux)
+            canvas.bind_all("<Button-5>", on_mousewheel_linux)
+        
+        def unbind_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+        
+        canvas.bind("<Enter>", bind_mousewheel)
+        canvas.bind("<Leave>", unbind_mousewheel)
         
         right = ttk.Frame(self.tess_tab, padding=10)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -876,9 +921,54 @@ class TransitKitGUI(tk.Tk):
         self.tess_plot.pack(fill=tk.BOTH, expand=True)
     
     def _build_analysis_tab(self):
-        """Build advanced analysis tab (NEW)."""
-        left = ttk.Frame(self.analysis_tab, padding=10)
-        left.pack(side=tk.LEFT, fill=tk.Y)
+        """Build advanced analysis tab (NEW) - with scrollable left panel."""
+        # Create a container for left panel with scrollbar
+        left_container = ttk.Frame(self.analysis_tab)
+        left_container.pack(side=tk.LEFT, fill=tk.Y)
+        
+        # Create canvas and scrollbar for scrollable content
+        canvas = tk.Canvas(left_container, width=280, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=canvas.yview)
+        
+        # Scrollable frame inside canvas
+        left = ttk.Frame(canvas, padding=10)
+        
+        # Configure canvas scrolling
+        def configure_scroll(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        left.bind("<Configure>", configure_scroll)
+        
+        canvas_frame = canvas.create_window((0, 0), window=left, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack scrollbar and canvas
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Enable mousewheel scrolling
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def on_mousewheel_linux(event):
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
+        
+        # Bind mousewheel only when hovering over this canvas
+        def bind_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", on_mousewheel)
+            canvas.bind_all("<Button-4>", on_mousewheel_linux)
+            canvas.bind_all("<Button-5>", on_mousewheel_linux)
+        
+        def unbind_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+        
+        canvas.bind("<Enter>", bind_mousewheel)
+        canvas.bind("<Leave>", unbind_mousewheel)
         
         right = ttk.Frame(self.analysis_tab, padding=10)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
@@ -939,9 +1029,54 @@ class TransitKitGUI(tk.Tk):
         self.analysis_plot.pack(fill=tk.BOTH, expand=True)
     
     def _build_advanced_tab(self):
-        """Build scientific tools tab (NEW)."""
-        left = ttk.Frame(self.advanced_tab, padding=10)
-        left.pack(side=tk.LEFT, fill=tk.Y)
+        """Build scientific tools tab (NEW) - with scrollable left panel."""
+        # Create a container for left panel with scrollbar
+        left_container = ttk.Frame(self.advanced_tab)
+        left_container.pack(side=tk.LEFT, fill=tk.Y)
+        
+        # Create canvas and scrollbar for scrollable content
+        canvas = tk.Canvas(left_container, width=280, highlightthickness=0)
+        scrollbar = ttk.Scrollbar(left_container, orient="vertical", command=canvas.yview)
+        
+        # Scrollable frame inside canvas
+        left = ttk.Frame(canvas, padding=10)
+        
+        # Configure canvas scrolling
+        def configure_scroll(event):
+            canvas.configure(scrollregion=canvas.bbox("all"))
+        
+        left.bind("<Configure>", configure_scroll)
+        
+        canvas_frame = canvas.create_window((0, 0), window=left, anchor="nw")
+        canvas.configure(yscrollcommand=scrollbar.set)
+        
+        # Pack scrollbar and canvas
+        scrollbar.pack(side=tk.RIGHT, fill=tk.Y)
+        canvas.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        
+        # Enable mousewheel scrolling
+        def on_mousewheel(event):
+            canvas.yview_scroll(int(-1*(event.delta/120)), "units")
+        
+        def on_mousewheel_linux(event):
+            if event.num == 4:
+                canvas.yview_scroll(-1, "units")
+            elif event.num == 5:
+                canvas.yview_scroll(1, "units")
+        
+        # Bind mousewheel only when hovering over this canvas
+        def bind_mousewheel(event):
+            canvas.bind_all("<MouseWheel>", on_mousewheel)
+            canvas.bind_all("<Button-4>", on_mousewheel_linux)
+            canvas.bind_all("<Button-5>", on_mousewheel_linux)
+        
+        def unbind_mousewheel(event):
+            canvas.unbind_all("<MouseWheel>")
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+        
+        canvas.bind("<Enter>", bind_mousewheel)
+        canvas.bind("<Leave>", unbind_mousewheel)
         
         right = ttk.Frame(self.advanced_tab, padding=10)
         right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
