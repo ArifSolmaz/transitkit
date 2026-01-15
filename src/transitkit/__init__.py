@@ -1,6 +1,7 @@
 """
 TransitKit v2.0: Professional Exoplanet Transit Light Curve Analysis Toolkit
 """
+
 from .__version__ import __version__, __version_tuple__
 
 __author__ = "Arif Solmaz"
@@ -41,10 +42,11 @@ from .visualization import (
 )
 
 __all__ = [
-    "__version__", "__version_tuple__",
+    "__version__",
+    "__version_tuple__",
     "TransitParameters",
     "generate_transit_signal_mandel_agol",
-    "find_transits_bls_advanced", 
+    "find_transits_bls_advanced",
     "find_transits_multiple_methods",
     "find_period_gls",
     "find_period_pdm",

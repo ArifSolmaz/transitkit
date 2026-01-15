@@ -34,9 +34,7 @@ def lookup_planet(query_text: str, default_only: bool = True, limit: int = 20) -
       pl_trandur (hours), pl_trandep (%), pl_ratror (Rp/Rs), default_flag
     """
     q = _escape_adql_string(query_text.strip())
-    where = (
-        f"(UPPER(pl_name) LIKE UPPER('%{q}%') OR UPPER(hostname) LIKE UPPER('%{q}%'))"
-    )
+    where = f"(UPPER(pl_name) LIKE UPPER('%{q}%') OR UPPER(hostname) LIKE UPPER('%{q}%'))"
     if default_only:
         where += " AND default_flag = 1"
 

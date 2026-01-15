@@ -35,8 +35,10 @@ __all__ = [
 # Helpers
 # ----------------------------
 
+
 def _as_float_array(x) -> np.ndarray:
     return np.asarray(x, dtype=float)
+
 
 def add_noise(
     flux: Union[np.ndarray, List[float]],
@@ -74,7 +76,9 @@ def add_noise(
     return f + rng.normal(0.0, noise_level, size=f.shape)
 
 
-def _box_model(time: np.ndarray, period: float, t0: float, duration: float, depth: float) -> np.ndarray:
+def _box_model(
+    time: np.ndarray, period: float, t0: float, duration: float, depth: float
+) -> np.ndarray:
     """Fast box-shaped transit model for fallback/testing."""
     t = _as_float_array(time)
     phase = ((t - t0) / period) % 1.0
@@ -99,6 +103,7 @@ def _infer_aRs_from_duration(period: float, duration: float, rprs: float) -> flo
 # ----------------------------
 # Data model
 # ----------------------------
+
 
 @dataclass
 class TransitParameters:
@@ -168,6 +173,7 @@ class TransitParameters:
 # Signal generation
 # ----------------------------
 
+
 def generate_transit_signal_mandel_agol(
     time: Union[np.ndarray, List[float]],
     period: float,
@@ -219,7 +225,9 @@ def generate_transit_signal_mandel_agol(
     # duration -> aRs approximation if missing
     if aRs is None:
         if duration is not None and duration > 0:
-            aRs = _infer_aRs_from_duration(period=float(period), duration=float(duration), rprs=float(rprs))
+            aRs = _infer_aRs_from_duration(
+                period=float(period), duration=float(duration), rprs=float(rprs)
+            )
         else:
             aRs = 15.0  # safe default
 
@@ -238,14 +246,18 @@ def generate_transit_signal_mandel_agol(
         params.u = [float(u1), float(u2)]
         params.limb_dark = "quadratic"
 
-        m = TransitModel(params, t, supersample_factor=int(max(supersample, 1)), exp_time=float(exptime))
+        m = TransitModel(
+            params, t, supersample_factor=int(max(supersample, 1)), exp_time=float(exptime)
+        )
         return m.light_curve(params)
 
     except Exception:
         # box fallback: use duration if provided; else approximate from aRs
         if duration is None or duration <= 0:
             # crude: duration fraction ~ (1+rprs)/aRs * period/pi
-            duration = float((period / np.pi) * np.arcsin(np.clip((1.0 + rprs) / max(aRs, 1e-6), 0, 1)))
+            duration = float(
+                (period / np.pi) * np.arcsin(np.clip((1.0 + rprs) / max(aRs, 1e-6), 0, 1))
+            )
             duration = max(duration, 0.01 * period)
 
         depth_box = float(depth) if depth is not None else float(rprs) ** 2
@@ -255,6 +267,7 @@ def generate_transit_signal_mandel_agol(
 # ----------------------------
 # Period search
 # ----------------------------
+
 
 def find_transits_bls_advanced(
     time: Union[np.ndarray, List[float]],
@@ -317,7 +330,7 @@ def find_transits_bls_advanced(
         # Edge case: duration/period constraint violated
         model = np.ones_like(f)
         resid = f - np.nanmedian(f)
-    
+
     rms = float(np.nanstd(resid))
 
     # in-transit points estimation
@@ -345,7 +358,9 @@ def find_transits_bls_advanced(
     if snr >= 5:
         try:
             _, param_errors = estimate_parameters_mcmc(
-                t, f, ferr,
+                t,
+                f,
+                ferr,
                 period_guess=best_period,
                 t0_guess=best_t0,
                 duration_guess=best_dur,
@@ -368,17 +383,13 @@ def find_transits_bls_advanced(
         "snr": float(snr),
         "fap": float(fap),
         "power": float(power.power[best_idx]),
-
         "all_periods": power.period,
         "all_powers": power.power,
         "all_durations": power.duration,
-
         "errors": param_errors,
-
         "residuals_rms": rms,
         "chi2": chi2,
         "bic": calculate_bic(t, f, model, ferr, n_params=4),
-
         "method": "bls_advanced",
         "objective": obj,
         "n_data_points": int(len(t)),
@@ -500,7 +511,9 @@ def estimate_parameters_mcmc(
     return samples, errors
 
 
-def find_period_gls(time, flux, flux_err=None, min_period: float = 0.5, max_period: float = 100.0) -> Dict[str, Any]:
+def find_period_gls(
+    time, flux, flux_err=None, min_period: float = 0.5, max_period: float = 100.0
+) -> Dict[str, Any]:
     """Generalized Lomb-Scargle periodogram."""
     from astropy.timeseries import LombScargle
 
@@ -509,29 +522,38 @@ def find_period_gls(time, flux, flux_err=None, min_period: float = 0.5, max_peri
     ferr = None if flux_err is None else _as_float_array(flux_err)
 
     ls = LombScargle(t, f, dy=ferr)
-    frequency, power = ls.autopower(minimum_frequency=1 / max_period, maximum_frequency=1 / min_period)
+    frequency, power = ls.autopower(
+        minimum_frequency=1 / max_period, maximum_frequency=1 / min_period
+    )
 
     best_idx = int(np.argmax(power))
     period = float(1.0 / frequency[best_idx])
     fap = float(ls.false_alarm_probability(power[best_idx]))
 
-    return {"period": period, "power": float(power[best_idx]), "fap": fap, "frequencies": frequency, "powers": power, "method": "gls"}
+    return {
+        "period": period,
+        "power": float(power[best_idx]),
+        "fap": fap,
+        "frequencies": frequency,
+        "powers": power,
+        "method": "gls",
+    }
 
 
 def _phase_dispersion_theta(time, flux, period, nbins=10):
     """
     Calculate PDM theta statistic for a given period.
-    
+
     Theta = variance_in_bins / total_variance
     Lower theta means better period match.
     """
     phase = ((time - time.min()) / period) % 1.0
     bin_edges = np.linspace(0, 1, nbins + 1)
-    
+
     total_var = np.nanvar(flux)
     if total_var == 0 or not np.isfinite(total_var):
         return 1.0
-    
+
     # Calculate variance within each bin
     bin_vars = []
     bin_counts = []
@@ -540,21 +562,28 @@ def _phase_dispersion_theta(time, flux, period, nbins=10):
         if np.sum(mask) > 1:
             bin_vars.append(np.nanvar(flux[mask]))
             bin_counts.append(np.sum(mask))
-    
+
     if len(bin_vars) == 0:
         return 1.0
-    
+
     # Weighted average of bin variances
     bin_vars = np.array(bin_vars)
     bin_counts = np.array(bin_counts)
-    
+
     weighted_var = np.nansum(bin_vars * (bin_counts - 1)) / np.nansum(bin_counts - 1)
     theta = weighted_var / total_var
-    
+
     return float(theta)
 
 
-def find_period_pdm(time, flux, nbins: int = 10, min_period: float = 0.5, max_period: float = 100.0, n_periods: int = 1000) -> Dict[str, Any]:
+def find_period_pdm(
+    time,
+    flux,
+    nbins: int = 10,
+    min_period: float = 0.5,
+    max_period: float = 100.0,
+    n_periods: int = 1000,
+) -> Dict[str, Any]:
     """Phase Dispersion Minimization (custom implementation)."""
     t = _as_float_array(time)
     f = _as_float_array(flux)
@@ -564,7 +593,13 @@ def find_period_pdm(time, flux, nbins: int = 10, min_period: float = 0.5, max_pe
 
     best_idx = int(np.nanargmin(thetas))
     best_period = float(periods[best_idx])
-    return {"period": best_period, "theta": float(thetas[best_idx]), "periods": periods, "thetas": thetas, "method": "pdm"}
+    return {
+        "period": best_period,
+        "theta": float(thetas[best_idx]),
+        "periods": periods,
+        "thetas": thetas,
+        "method": "pdm",
+    }
 
 
 def find_transits_multiple_methods(
@@ -585,13 +620,17 @@ def find_transits_multiple_methods(
     results: Dict[str, Any] = {}
 
     if "bls" in methods:
-        results["bls"] = find_transits_bls_advanced(time, flux, flux_err, min_period, max_period, n_periods)
+        results["bls"] = find_transits_bls_advanced(
+            time, flux, flux_err, min_period, max_period, n_periods
+        )
 
     if "gls" in methods:
         results["gls"] = find_period_gls(time, flux, flux_err, min_period, max_period)
 
     if "pdm" in methods:
-        results["pdm"] = find_period_pdm(time, flux, min_period=min_period, max_period=max_period, n_periods=n_periods)
+        results["pdm"] = find_period_pdm(
+            time, flux, min_period=min_period, max_period=max_period, n_periods=n_periods
+        )
 
     consensus = calculate_consensus(results)
     results["consensus"] = consensus
@@ -632,7 +671,7 @@ def calculate_consensus(results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     p_arr = np.asarray(periods, dtype=float)
     w_arr = np.asarray(weights, dtype=float)
-    
+
     # Normalize weights
     s = float(np.sum(w_arr))
     if not np.isfinite(s) or s <= 0:
@@ -647,18 +686,18 @@ def calculate_consensus(results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         ref_idx = methods_used.index("bls")
     else:
         ref_idx = int(np.argmax(w_arr))
-    
+
     ref_period = p_arr[ref_idx]
-    
+
     aligned_periods = []
     harmonic_info = {}
-    
+
     # Common harmonic ratios to check (including integer multiples)
-    harmonic_ratios = [0.2, 0.25, 1.0/3, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0]
-    
+    harmonic_ratios = [0.2, 0.25, 1.0 / 3, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0]
+
     for i, p in enumerate(p_arr):
         ratio = p / ref_period if ref_period > 0 else 1.0
-        
+
         # Check for common harmonic ratios
         best_mult = 1.0
         min_diff = 0.08  # 8% tolerance
@@ -667,26 +706,27 @@ def calculate_consensus(results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
             if diff < min_diff:
                 min_diff = diff
                 best_mult = mult
-        
+
         # Align period to fundamental
         aligned_p = p / best_mult if best_mult != 0 else p
         aligned_periods.append(aligned_p)
-        
+
         if best_mult != 1.0:
             harmonic_info[methods_used[i]] = f"{best_mult:.2f}x harmonic"
-    
+
     aligned_arr = np.asarray(aligned_periods, dtype=float)
-    
+
     # Check if aligned periods agree (within 5%)
     if len(aligned_arr) > 1:
         median_p = float(np.median(aligned_arr))
         agreement_mask = np.abs(aligned_arr - median_p) / median_p < 0.05
         n_agree = int(np.sum(agreement_mask))
-        
+
         if n_agree >= 2:
             # Use only agreeing periods for consensus
-            consensus_period = float(np.average(aligned_arr[agreement_mask], 
-                                                weights=w_arr[agreement_mask]))
+            consensus_period = float(
+                np.average(aligned_arr[agreement_mask], weights=w_arr[agreement_mask])
+            )
         else:
             # Fall back to weighted average of aligned periods
             consensus_period = float(np.average(aligned_arr, weights=w_arr))
@@ -708,7 +748,9 @@ def calculate_consensus(results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
     }
 
 
-def check_harmonics(periods: np.ndarray, reference: float, tolerance: float = 0.01) -> Dict[str, Any]:
+def check_harmonics(
+    periods: np.ndarray, reference: float, tolerance: float = 0.01
+) -> Dict[str, Any]:
     """Check for simple harmonic relationships w.r.t. reference."""
     out: Dict[str, Any] = {}
     if reference <= 0:
@@ -729,6 +771,7 @@ def check_harmonics(periods: np.ndarray, reference: float, tolerance: float = 0.
 # ----------------------------
 # Validation
 # ----------------------------
+
 
 def validate_transit_detection(time, flux, consensus, all_results) -> Dict[str, Any]:
     """Validate detection with simple sanity checks."""
@@ -817,8 +860,8 @@ def check_secondary_eclipse(time, flux, period, t0) -> Dict[str, Any]:
         return {"detected": False, "depth": 0.0}
 
     phase = ((t - t0) / period) % 1.0
-    sec = (np.abs(phase - 0.5) < 0.03)
-    oot = (np.abs(phase - 0.5) > 0.10)
+    sec = np.abs(phase - 0.5) < 0.03
+    oot = np.abs(phase - 0.5) > 0.10
 
     if np.sum(sec) < 10 or np.sum(oot) < 10:
         return {"detected": False, "depth": 0.0}
@@ -831,7 +874,11 @@ def check_secondary_eclipse(time, flux, period, t0) -> Dict[str, Any]:
     t_stat, p_value = stats.ttest_ind(f[oot], f[sec], equal_var=False, nan_policy="omit")
     detected = bool(np.isfinite(p_value) and p_value < 0.001 and depth > 0)
 
-    return {"detected": detected, "depth": float(depth), "p_value": float(p_value) if np.isfinite(p_value) else 1.0}
+    return {
+        "detected": detected,
+        "depth": float(depth),
+        "p_value": float(p_value) if np.isfinite(p_value) else 1.0,
+    }
 
 
 def check_stellar_variability(time, flux) -> Dict[str, Any]:
