@@ -604,9 +604,9 @@ class TestEdgeCases:
             duration=0.1
         )
         
-        # Should handle gracefully
+        # Should handle gracefully - may find 0-1 transits but not detect TTVs
         assert result["ttvs_detected"] == False
-        assert len(result["ttvs"]) <= 1
+        assert len(result["ttvs"]) <= 1  # Can't measure TTVs with <=1 transit
 
 
 if __name__ == "__main__":
