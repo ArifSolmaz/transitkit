@@ -258,13 +258,23 @@ class EnhancedPlotPanel(ttk.Frame):
         self.canvas.draw()
         self._save_to_history()
 
-    def plot_line(self, x, y, xlabel="", ylabel="", title="", lw=2, ax_index=0):
+    def plot_line(self, x, y, xlabel="", ylabel="", title="", lw=2, ax_index=0, 
+                  label=None, color=None, alpha=1.0, clear=True):
         ax = self.axes[ax_index]
-        ax.clear()
-        ax.plot(x, y, linewidth=lw)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel(ylabel)
-        ax.set_title(title)
+        if clear:
+            ax.clear()
+        plot_kwargs = {"linewidth": lw, "alpha": alpha}
+        if label:
+            plot_kwargs["label"] = label
+        if color:
+            plot_kwargs["color"] = color
+        ax.plot(x, y, **plot_kwargs)
+        if xlabel:
+            ax.set_xlabel(xlabel)
+        if ylabel:
+            ax.set_ylabel(ylabel)
+        if title:
+            ax.set_title(title)
         ax.grid(True, alpha=0.3)
         self.fig.tight_layout()
         self.canvas.draw()
@@ -2532,30 +2542,33 @@ For updates, bug reports, and contributions:
                     panel.pack(fill=tk.BOTH, expand=True)
                     panel.set_subplots(1)
                     
-                    # Plot BLS
+                    # Plot BLS (first - clears axes)
                     if 'bls' in results:
                         bls = results['bls']
                         if 'all_periods' in bls and 'all_powers' in bls:
-                            panel.plot_line(bls['all_periods'], bls['all_powers'],
-                                           label='BLS', color='blue')
+                            # Normalize for comparison
+                            bls_power = bls['all_powers'] / np.nanmax(bls['all_powers'])
+                            panel.plot_line(bls['all_periods'], bls_power,
+                                           label='BLS', color='blue', clear=True)
                     
-                    # Plot GLS
+                    # Plot GLS (overlay - don't clear)
                     if 'gls' in results:
                         gls = results['gls']
-                        if 'periods' in gls and 'powers' in gls:
-                            # Normalize for comparison
-                            gls_power = gls['powers'] / np.max(gls['powers'])
-                            panel.plot_line(gls['periods'], gls_power,
-                                           label='GLS', color='red', alpha=0.7)
+                        if 'frequencies' in gls and 'powers' in gls:
+                            # Convert frequency to period and normalize
+                            gls_periods = 1.0 / gls['frequencies']
+                            gls_power = gls['powers'] / np.nanmax(gls['powers'])
+                            panel.plot_line(gls_periods, gls_power,
+                                           label='GLS', color='red', alpha=0.7, clear=False)
                     
-                    # Plot PDM (inverted since lower is better)
+                    # Plot PDM (overlay - don't clear, inverted since lower is better)
                     if 'pdm' in results:
                         pdm = results['pdm']
                         if 'periods' in pdm and 'thetas' in pdm:
                             # Invert and normalize
-                            pdm_power = 1 - (pdm['thetas'] / np.max(pdm['thetas']))
+                            pdm_power = 1 - (pdm['thetas'] / np.nanmax(pdm['thetas']))
                             panel.plot_line(pdm['periods'], pdm_power,
-                                           label='PDM', color='green', alpha=0.7)
+                                           label='PDM', color='green', alpha=0.7, clear=False)
                     
                     panel.axes[0].set_xlabel("Period (days)")
                     panel.axes[0].set_ylabel("Normalized Power")
