@@ -4,11 +4,12 @@ Advanced statistical analysis for transit light curves.
 Includes detrending, systematics removal, and significance testing.
 """
 
+import warnings
+
 import numpy as np
-from scipy import signal, optimize, stats
+from scipy import optimize, signal, stats
 from sklearn.gaussian_process import GaussianProcessRegressor
 from sklearn.gaussian_process.kernels import RBF, WhiteKernel
-import warnings
 
 
 def detrend_light_curve_gp(

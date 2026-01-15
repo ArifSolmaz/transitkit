@@ -5,43 +5,44 @@ Tests for all core functionality including transit detection,
 parameter estimation, analysis, and validation.
 """
 
-import numpy as np
-import pytest
 import warnings
 
+import numpy as np
+import pytest
+
 warnings.filterwarnings("ignore")
+
+from transitkit.analysis import (
+    detrend_light_curve_gp,
+    measure_transit_timing_variations,
+    remove_systematics_pca,
+)
 
 # Import transitkit modules
 from transitkit.core import (
     TransitParameters,
-    generate_transit_signal_mandel_agol,
+    _phase_dispersion_theta,
     add_noise,
-    find_transits_bls_advanced,
-    find_transits_multiple_methods,
     find_period_gls,
     find_period_pdm,
-    _phase_dispersion_theta,
-)
-from transitkit.analysis import (
-    detrend_light_curve_gp,
-    remove_systematics_pca,
-    measure_transit_timing_variations,
-)
-from transitkit.utils import (
-    calculate_snr,
-    estimate_limb_darkening,
-    calculate_transit_duration_from_parameters,
-    check_data_quality,
-    time_to_phase,
-    detect_outliers_modified_zscore,
-)
-from transitkit.validation import (
-    validate_transit_parameters,
-    perform_injection_recovery_test,
-    calculate_detection_significance,
+    find_transits_bls_advanced,
+    find_transits_multiple_methods,
+    generate_transit_signal_mandel_agol,
 )
 from transitkit.io import export_transit_results
-
+from transitkit.utils import (
+    calculate_snr,
+    calculate_transit_duration_from_parameters,
+    check_data_quality,
+    detect_outliers_modified_zscore,
+    estimate_limb_darkening,
+    time_to_phase,
+)
+from transitkit.validation import (
+    calculate_detection_significance,
+    perform_injection_recovery_test,
+    validate_transit_parameters,
+)
 
 # =============================================================================
 # Fixtures

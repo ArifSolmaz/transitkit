@@ -7,7 +7,7 @@ import pytest
 @pytest.fixture
 def synthetic_transit():
     """Generate synthetic transit data."""
-    from transitkit.core import generate_transit_signal_mandel_agol, add_noise
+    from transitkit.core import add_noise, generate_transit_signal_mandel_agol
 
     np.random.seed(42)
     time = np.linspace(0, 50, 3000)

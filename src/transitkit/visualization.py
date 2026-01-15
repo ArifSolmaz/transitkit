@@ -3,12 +3,12 @@
 Publication-quality visualization tools for transit light curves.
 """
 
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib import gridspec
 import matplotlib
-from matplotlib.ticker import ScalarFormatter, AutoMinorLocator
+import matplotlib.pyplot as plt
+import numpy as np
 import seaborn as sns
+from matplotlib import gridspec
+from matplotlib.ticker import AutoMinorLocator, ScalarFormatter
 
 
 def setup_publication_style(fontsize=12, dpi=300, style="default"):

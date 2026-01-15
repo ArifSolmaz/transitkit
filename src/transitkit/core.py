@@ -12,11 +12,11 @@ from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Dict, Optional, Tuple, List, Union, Any
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
-from scipy import stats
 from astropy.timeseries import BoxLeastSquares
+from scipy import stats
 
 __all__ = [
     "TransitParameters",
@@ -233,7 +233,7 @@ def generate_transit_signal_mandel_agol(
 
     # Try batman; fallback to box model
     try:
-        from batman import TransitParams, TransitModel  # type: ignore
+        from batman import TransitModel, TransitParams  # type: ignore
 
         params = TransitParams()
         params.t0 = float(t0)

@@ -3,12 +3,17 @@
 Validation tools for transit analysis results.
 """
 
-import numpy as np
-from scipy import stats
 import warnings
 
+import numpy as np
+from scipy import stats
+
 # Import core functions needed for validation tests
-from .core import generate_transit_signal_mandel_agol, add_noise, find_transits_bls_advanced
+from .core import (
+    add_noise,
+    find_transits_bls_advanced,
+    generate_transit_signal_mandel_agol,
+)
 
 
 def validate_transit_parameters(params, time, flux):

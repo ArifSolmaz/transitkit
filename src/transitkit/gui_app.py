@@ -21,16 +21,16 @@ Adds NEW scientific features:
 
 from __future__ import annotations
 
+import json
 import os
 import re
 import threading
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog, simpledialog
-from tkinter.scrolledtext import ScrolledText
+import warnings
 from datetime import datetime
 from pathlib import Path
-import json
-import warnings
+from tkinter import filedialog, messagebox, simpledialog, ttk
+from tkinter.scrolledtext import ScrolledText
 
 import numpy as np
 import pandas as pd
@@ -38,56 +38,56 @@ import pandas as pd
 # Try to import transitkit modules with fallbacks
 try:
     import transitkit
+    from transitkit.analysis import (
+        calculate_transit_duration_ratio,
+        detrend_light_curve_gp,
+        fit_transit_time,
+        measure_transit_timing_variations,
+        remove_systematics_pca,
+    )
     from transitkit.core import (
         TransitParameters,
-        find_transits_bls_advanced,
-        find_transits_multiple_methods,
-        generate_transit_signal_mandel_agol,
+        add_noise,
+        calculate_consensus,
+        check_odd_even_consistency,
         estimate_parameters_mcmc,
         find_period_gls,
         find_period_pdm,
-        calculate_consensus,
+        find_transits_bls_advanced,
+        find_transits_multiple_methods,
+        generate_transit_signal_mandel_agol,
         validate_transit_detection,
-        check_odd_even_consistency,
-        add_noise,
-    )
-    from transitkit.analysis import (
-        detrend_light_curve_gp,
-        remove_systematics_pca,
-        measure_transit_timing_variations,
-        calculate_transit_duration_ratio,
-        fit_transit_time,
-    )
-    from transitkit.visualization import (
-        setup_publication_style,
-        plot_transit_summary,
-        create_transit_report_figure,
-        plot_mcmc_corner,
-        plot_full_light_curve,
-        plot_phase_folded,
-        plot_individual_transit,
-        plot_periodogram_comparison,
     )
     from transitkit.io import (
-        load_tess_data_advanced,
-        load_ground_based_data,
         export_transit_results,
+        load_ground_based_data,
+        load_tess_data_advanced,
     )
     from transitkit.utils import (
+        calculate_cdpp,
         calculate_snr,
-        estimate_limb_darkening,
         calculate_transit_duration_from_parameters,
         check_data_quality,
         detect_outliers_modified_zscore,
+        estimate_limb_darkening,
         time_to_phase,
-        calculate_cdpp,
     )
     from transitkit.validation import (
-        validate_transit_parameters,
+        calculate_detection_significance,
         compare_with_known_ephemeris,
         perform_injection_recovery_test,
-        calculate_detection_significance,
         validate_against_secondary_eclipse,
+        validate_transit_parameters,
+    )
+    from transitkit.visualization import (
+        create_transit_report_figure,
+        plot_full_light_curve,
+        plot_individual_transit,
+        plot_mcmc_corner,
+        plot_periodogram_comparison,
+        plot_phase_folded,
+        plot_transit_summary,
+        setup_publication_style,
     )
 
     HAS_ADVANCED = True
@@ -115,9 +115,9 @@ except ImportError:
 import matplotlib
 
 matplotlib.use("TkAgg")
+from matplotlib import rcParams
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg, NavigationToolbar2Tk
 from matplotlib.figure import Figure
-from matplotlib import rcParams
 
 
 # -------------------------
@@ -436,6 +436,7 @@ class EnhancedPlotPanel(ttk.Frame):
         """Load figure from history."""
         if 0 <= self.history_index < len(self.plot_history):
             import io
+
             from matplotlib.image import imread
 
             buf = io.BytesIO(self.plot_history[self.history_index])

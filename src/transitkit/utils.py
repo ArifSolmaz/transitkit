@@ -3,11 +3,12 @@
 Utilities for transit analysis.
 """
 
+import warnings
+
 import numpy as np
-from scipy import signal, stats
 from astropy import units as u
 from astropy.time import Time
-import warnings
+from scipy import signal, stats
 
 
 def calculate_snr(time, flux, period, t0, duration):

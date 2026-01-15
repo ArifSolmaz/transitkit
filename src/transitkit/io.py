@@ -3,16 +3,17 @@
 Professional data I/O for various formats and missions.
 """
 
+import json
+import pickle
+import warnings
+from io import BytesIO, StringIO
+
+import lightkurve as lk
 import numpy as np
 import pandas as pd
-import warnings
+import requests
 from astropy.io import fits
 from astropy.table import Table
-import lightkurve as lk
-import requests
-from io import StringIO, BytesIO
-import pickle
-import json
 
 # Optional h5py import
 try:

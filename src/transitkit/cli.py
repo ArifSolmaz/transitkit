@@ -1,59 +1,59 @@
 """Professional Command Line Interface for TransitKit v2.0"""
 
+import json
 import os
 import sys
-import json
 import warnings
 from pathlib import Path
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
 import click
-import numpy as np
 import matplotlib.pyplot as plt
-from rich.console import Console
-from rich.table import Table
-from rich.progress import Progress, SpinnerColumn, TextColumn
-from rich.panel import Panel
+import numpy as np
 from rich import box
+from rich.console import Console
+from rich.panel import Panel
+from rich.progress import Progress, SpinnerColumn, TextColumn
+from rich.table import Table
 
 # Import transitkit modules
 try:
     import transitkit as tk
+    from transitkit.analysis import (
+        calculate_transit_duration_ratio,
+        detrend_light_curve_gp,
+        measure_transit_timing_variations,
+        remove_systematics_pca,
+    )
     from transitkit.core import (
         TransitParameters,
+        estimate_parameters_mcmc,
         find_transits_bls_advanced,
         find_transits_multiple_methods,
         generate_transit_signal_mandel_agol,
-        estimate_parameters_mcmc,
-    )
-    from transitkit.analysis import (
-        detrend_light_curve_gp,
-        remove_systematics_pca,
-        measure_transit_timing_variations,
-        calculate_transit_duration_ratio,
-    )
-    from transitkit.visualization import (
-        setup_publication_style,
-        plot_transit_summary,
-        create_transit_report_figure,
-        plot_mcmc_corner,
     )
     from transitkit.io import (
-        load_tess_data_advanced,
-        load_ground_based_data,
         export_transit_results,
+        load_ground_based_data,
+        load_tess_data_advanced,
     )
     from transitkit.utils import (
         calculate_snr,
-        estimate_limb_darkening,
         calculate_transit_duration_from_parameters,
         check_data_quality,
+        estimate_limb_darkening,
     )
     from transitkit.validation import (
-        validate_transit_parameters,
+        calculate_detection_significance,
         compare_with_known_ephemeris,
         perform_injection_recovery_test,
-        calculate_detection_significance,
+        validate_transit_parameters,
+    )
+    from transitkit.visualization import (
+        create_transit_report_figure,
+        plot_mcmc_corner,
+        plot_transit_summary,
+        setup_publication_style,
     )
 except ImportError as e:
     click.echo(f"Error importing TransitKit modules: {e}", err=True)
