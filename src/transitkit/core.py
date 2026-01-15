@@ -305,8 +305,19 @@ def find_transits_bls_advanced(
     best_dur = float(power.duration[best_idx])
     best_depth = float(power.depth[best_idx])
 
-    model = bls.model(t, best_period, best_dur, best_t0)
-    resid = f - model
+    # Ensure duration < period (required by astropy BLS)
+    if best_dur >= best_period:
+        best_dur = best_period * 0.8
+
+    # Try to compute model, fall back to simple residuals if it fails
+    try:
+        model = bls.model(t, best_period, best_dur, best_t0)
+        resid = f - model
+    except ValueError:
+        # Edge case: duration/period constraint violated
+        model = np.ones_like(f)
+        resid = f - np.nanmedian(f)
+    
     rms = float(np.nanstd(resid))
 
     # in-transit points estimation
