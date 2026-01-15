@@ -12,8 +12,15 @@ import lightkurve as lk
 import requests
 from io import StringIO, BytesIO
 import pickle
-import h5py
 import json
+
+# Optional h5py import
+try:
+    import h5py
+    HAS_H5PY = True
+except ImportError:
+    h5py = None
+    HAS_H5PY = False
 
 def load_tess_data_advanced(target, sectors='all', author='SPOC', 
                            cadence='short', quality_bitmask='default',
@@ -178,6 +185,8 @@ def load_ground_based_data(filename, format='auto', **kwargs):
         raise ValueError("No table data found in FITS file")
     
     elif format == 'hdf5':
+        if not HAS_H5PY:
+            raise ImportError("h5py is required for HDF5 files. Install with: pip install h5py")
         with h5py.File(filename, 'r') as f:
             # Convert to dict
             data = {}
@@ -238,6 +247,8 @@ def export_transit_results(results, filename, format='auto'):
         df.to_csv(filename, index=False)
     
     elif format == 'hdf5':
+        if not HAS_H5PY:
+            raise ImportError("h5py is required for HDF5 files. Install with: pip install h5py")
         with h5py.File(filename, 'w') as f:
             def save_dict_to_hdf5(group, data):
                 for key, value in data.items():
