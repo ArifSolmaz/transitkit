@@ -55,16 +55,7 @@
 <p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core Module</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Analysis Module</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#transitkit.analysis.calculate_transit_duration_ratio"><code class="docutils literal notranslate"><span class="pre">calculate_transit_duration_ratio()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#transitkit.analysis.correct_for_airmass"><code class="docutils literal notranslate"><span class="pre">correct_for_airmass()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#transitkit.analysis.detrend_light_curve_gp"><code class="docutils literal notranslate"><span class="pre">detrend_light_curve_gp()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#transitkit.analysis.fit_sinusoidal_ttv"><code class="docutils literal notranslate"><span class="pre">fit_sinusoidal_ttv()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#transitkit.analysis.fit_transit_time"><code class="docutils literal notranslate"><span class="pre">fit_transit_time()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#transitkit.analysis.measure_transit_timing_variations"><code class="docutils literal notranslate"><span class="pre">measure_transit_timing_variations()</span></code></a></li>
-<li class="toctree-l2"><a class="reference internal" href="#transitkit.analysis.remove_systematics_pca"><code class="docutils literal notranslate"><span class="pre">remove_systematics_pca()</span></code></a></li>
-</ul>
-</li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Analysis Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="validation.html">Validation Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="io.html">I/O Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization Module</a></li>
@@ -101,73 +92,6 @@
   <section id="analysis-module">
 <h1>Analysis Module<a class="headerlink" href="#analysis-module" title="Link to this heading"></a></h1>
 <p>Detrending, TTV analysis, and advanced processing.</p>
-<p id="module-transitkit.analysis">Advanced statistical analysis for transit light curves.
-Includes detrending, systematics removal, and significance testing.</p>
-<dl class="py function">
-<dt class="sig sig-object py" id="transitkit.analysis.calculate_transit_duration_ratio">
-<span class="sig-prename descclassname"><span class="pre">transitkit.analysis.</span></span><span class="sig-name descname"><span class="pre">calculate_transit_duration_ratio</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">primary_duration</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">secondary_duration</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">period</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">eccentricity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">omega</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">90</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/analysis.html#calculate_transit_duration_ratio"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.analysis.calculate_transit_duration_ratio" title="Link to this definition"></a></dt>
-<dd><p>Calculate transit duration ratio for eccentricity constraints.</p>
-<p>For eccentric orbits, duration varies with true anomaly.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="transitkit.analysis.correct_for_airmass">
-<span class="sig-prename descclassname"><span class="pre">transitkit.analysis.</span></span><span class="sig-name descname"><span class="pre">correct_for_airmass</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">airmass</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux_err</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/analysis.html#correct_for_airmass"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.analysis.correct_for_airmass" title="Link to this definition"></a></dt>
-<dd><p>Correct for airmass effects (ground-based observations).</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="transitkit.analysis.detrend_light_curve_gp">
-<span class="sig-prename descclassname"><span class="pre">transitkit.analysis.</span></span><span class="sig-name descname"><span class="pre">detrend_light_curve_gp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux_err</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">in_transit_mask</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kernel</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">optimize_hyperparams</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/analysis.html#detrend_light_curve_gp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.analysis.detrend_light_curve_gp" title="Link to this definition"></a></dt>
-<dd><p>Detrend light curve using Gaussian Process regression.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>time</strong> (<em>array</em>) – Time array</p></li>
-<li><p><strong>flux</strong> (<em>array</em>) – Flux array</p></li>
-<li><p><strong>flux_err</strong> (<em>array</em><em>, </em><em>optional</em>) – Flux errors</p></li>
-<li><p><strong>in_transit_mask</strong> (<em>array</em><em>, </em><em>optional</em>) – Boolean mask of in-transit points to exclude from GP fit</p></li>
-<li><p><strong>kernel</strong> (<em>sklearn.gaussian_process.kernels.Kernel</em>) – GP kernel</p></li>
-<li><p><strong>optimize_hyperparams</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#bool" title="(in Python v3.14)"><em>bool</em></a>) – Whether to optimize hyperparameters</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p><ul class="simple">
-<li><p><strong>detrended_flux</strong> (<em>array</em>) – Detrended flux</p></li>
-<li><p><strong>trend</strong> (<em>array</em>) – Fitted trend</p></li>
-<li><p><strong>gp</strong> (<em>GaussianProcessRegressor</em>) – Fitted GP model</p></li>
-</ul>
-</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="transitkit.analysis.fit_sinusoidal_ttv">
-<span class="sig-prename descclassname"><span class="pre">transitkit.analysis.</span></span><span class="sig-name descname"><span class="pre">fit_sinusoidal_ttv</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">epochs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ttvs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ttv_errs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/analysis.html#fit_sinusoidal_ttv"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.analysis.fit_sinusoidal_ttv" title="Link to this definition"></a></dt>
-<dd><p>Fit sinusoidal TTV pattern.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="transitkit.analysis.fit_transit_time">
-<span class="sig-prename descclassname"><span class="pre">transitkit.analysis.</span></span><span class="sig-name descname"><span class="pre">fit_transit_time</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">period</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t0_guess</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/analysis.html#fit_transit_time"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.analysis.fit_transit_time" title="Link to this definition"></a></dt>
-<dd><p>Fit precise transit time for a single epoch.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="transitkit.analysis.measure_transit_timing_variations">
-<span class="sig-prename descclassname"><span class="pre">transitkit.analysis.</span></span><span class="sig-name descname"><span class="pre">measure_transit_timing_variations</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">period</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">t0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_factor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><span class="pre">float</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.5</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_points</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><span class="pre">int</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">8</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/analysis.html#measure_transit_timing_variations"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.analysis.measure_transit_timing_variations" title="Link to this definition"></a></dt>
-<dd><p>Lightweight TTV estimator.
-Always returns keys required by tests: ttvs_detected, p_value, ttvs, epochs, rms_ttv.</p>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="transitkit.analysis.remove_systematics_pca">
-<span class="sig-prename descclassname"><span class="pre">transitkit.analysis.</span></span><span class="sig-name descname"><span class="pre">remove_systematics_pca</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_components</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">5</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/analysis.html#remove_systematics_pca"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.analysis.remove_systematics_pca" title="Link to this definition"></a></dt>
-<dd><p>Remove systematics using Principal Component Analysis.
-Useful for TESS/Kepler data with common systematics.</p>
-</dd></dl>
-
 </section>
 
 
