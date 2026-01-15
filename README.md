@@ -61,6 +61,23 @@ pip install -e ".[dev,full]"
 | `dev` | pytest, black, etc. | Development |
 | `docs` | sphinx, etc. | Documentation building |
 
+## Interactive Demo App
+
+TransitKit includes a Streamlit web app for interactive exploration:
+
+```bash
+pip install streamlit
+streamlit run app.py
+```
+
+**Features:**
+- 🌟 **Synthetic Transit** - Generate custom transits with adjustable parameters
+- 🔬 **Multi-Method** - Compare BLS, GLS, PDM detection algorithms  
+- ⏱️ **TTV Analysis** - Explore transit timing variations
+- 📊 **Batch Analysis** - Run injection-recovery tests
+
+![Demo App](https://img.shields.io/badge/Demo-Streamlit-FF4B4B?logo=streamlit)
+
 ## Quick Start
 
 ### Basic Transit Detection
