@@ -633,7 +633,27 @@ class TransitKitGUI(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("TransitKit v2.0.0")
-        self.geometry("1400x900")
+        
+        # Get screen dimensions and set responsive window size
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        # Target size: 1400x900, but cap at 90% of screen dimensions
+        target_width = min(1400, int(screen_width * 0.9))
+        target_height = min(900, int(screen_height * 0.85))  # Leave room for dock/menubar on Mac
+        
+        # Ensure minimum usable size
+        target_width = max(target_width, 1000)
+        target_height = max(target_height, 700)
+        
+        self.geometry(f"{target_width}x{target_height}")
+        
+        # Set min/max size constraints
+        self.minsize(900, 600)
+        self.maxsize(screen_width, screen_height)
+        
+        # Allow window resizing
+        self.resizable(True, True)
         
         # Application state (ORIGINAL + NEW)
         self._busy_count = 0
@@ -670,8 +690,10 @@ class TransitKitGUI(tk.Tk):
         main_container = ttk.Frame(self)
         main_container.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # Left panel (controls) - ORIGINAL LAYOUT
-        left_panel = ttk.Frame(main_container, width=350)
+        # Left panel (controls) - ORIGINAL LAYOUT with responsive width
+        left_panel_width = min(350, int(self.winfo_screenwidth() * 0.25))
+        left_panel_width = max(left_panel_width, 280)  # Minimum width for controls
+        left_panel = ttk.Frame(main_container, width=left_panel_width)
         left_panel.pack(side=tk.LEFT, fill=tk.Y, padx=(0, 5))
         left_panel.pack_propagate(False)
         
@@ -2254,12 +2276,28 @@ For updates, bug reports, and contributions:
             self.console.warning("⚠ NEA module not available")
     
     def _center_window(self):
-        """Center window on screen."""
+        """Center window on screen with bounds checking."""
         self.update_idletasks()
+        
         width = self.winfo_width()
         height = self.winfo_height()
-        x = (self.winfo_screenwidth() // 2) - (width // 2)
-        y = (self.winfo_screenheight() // 2) - (height // 2)
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+        
+        # Ensure window fits on screen
+        if width > screen_width:
+            width = int(screen_width * 0.9)
+        if height > screen_height:
+            height = int(screen_height * 0.85)
+        
+        # Calculate centered position
+        x = max(0, (screen_width - width) // 2)
+        y = max(0, (screen_height - height) // 2)
+        
+        # On Mac, leave room for menubar at top
+        if y < 25:
+            y = 25
+        
         self.geometry(f'{width}x{height}+{x}+{y}')
     
     def _cadence_seconds(self):

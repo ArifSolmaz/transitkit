@@ -489,7 +489,7 @@ def estimate_parameters_mcmc(
     return samples, errors
 
 
-def find_period_gls(time, flux, flux_err=None) -> Dict[str, Any]:
+def find_period_gls(time, flux, flux_err=None, min_period: float = 0.5, max_period: float = 100.0) -> Dict[str, Any]:
     """Generalized Lomb-Scargle periodogram."""
     from astropy.timeseries import LombScargle
 
@@ -498,7 +498,7 @@ def find_period_gls(time, flux, flux_err=None) -> Dict[str, Any]:
     ferr = None if flux_err is None else _as_float_array(flux_err)
 
     ls = LombScargle(t, f, dy=ferr)
-    frequency, power = ls.autopower(minimum_frequency=1 / 100.0, maximum_frequency=1 / 0.5)
+    frequency, power = ls.autopower(minimum_frequency=1 / max_period, maximum_frequency=1 / min_period)
 
     best_idx = int(np.argmax(power))
     period = float(1.0 / frequency[best_idx])
@@ -577,10 +577,10 @@ def find_transits_multiple_methods(
         results["bls"] = find_transits_bls_advanced(time, flux, flux_err, min_period, max_period, n_periods)
 
     if "gls" in methods:
-        results["gls"] = find_period_gls(time, flux, flux_err)
+        results["gls"] = find_period_gls(time, flux, flux_err, min_period, max_period)
 
     if "pdm" in methods:
-        results["pdm"] = find_period_pdm(time, flux)
+        results["pdm"] = find_period_pdm(time, flux, min_period=min_period, max_period=max_period, n_periods=n_periods)
 
     consensus = calculate_consensus(results)
     results["consensus"] = consensus
@@ -590,9 +590,10 @@ def find_transits_multiple_methods(
 
 
 def calculate_consensus(results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    """Weighted consensus period from methods."""
+    """Weighted consensus period from methods with harmonic alignment."""
     periods: List[float] = []
     weights: List[float] = []
+    methods_used: List[str] = []
 
     for method, result in results.items():
         if method not in {"bls", "gls", "pdm"}:
@@ -602,6 +603,7 @@ def calculate_consensus(results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
         p = float(result["period"])
         periods.append(p)
+        methods_used.append(method)
 
         # prefer low FAP; else SNR; else weight=1
         w = 1.0
@@ -619,24 +621,79 @@ def calculate_consensus(results: Dict[str, Any]) -> Optional[Dict[str, Any]]:
 
     p_arr = np.asarray(periods, dtype=float)
     w_arr = np.asarray(weights, dtype=float)
-
+    
+    # Normalize weights
     s = float(np.sum(w_arr))
     if not np.isfinite(s) or s <= 0:
         w_arr = np.ones_like(w_arr) / len(w_arr)
     else:
         w_arr = w_arr / s
 
-    consensus_period = float(np.average(p_arr, weights=w_arr))
+    # --- HARMONIC ALIGNMENT ---
+    # Use BLS as reference (best for transit detection), fall back to highest weight
+    ref_idx = 0
+    if "bls" in methods_used:
+        ref_idx = methods_used.index("bls")
+    else:
+        ref_idx = int(np.argmax(w_arr))
+    
+    ref_period = p_arr[ref_idx]
+    
+    aligned_periods = []
+    harmonic_info = {}
+    
+    # Common harmonic ratios to check (including integer multiples)
+    harmonic_ratios = [0.2, 0.25, 1.0/3, 0.5, 1.0, 2.0, 3.0, 4.0, 5.0]
+    
+    for i, p in enumerate(p_arr):
+        ratio = p / ref_period if ref_period > 0 else 1.0
+        
+        # Check for common harmonic ratios
+        best_mult = 1.0
+        min_diff = 0.08  # 8% tolerance
+        for mult in harmonic_ratios:
+            diff = abs(ratio - mult)
+            if diff < min_diff:
+                min_diff = diff
+                best_mult = mult
+        
+        # Align period to fundamental
+        aligned_p = p / best_mult if best_mult != 0 else p
+        aligned_periods.append(aligned_p)
+        
+        if best_mult != 1.0:
+            harmonic_info[methods_used[i]] = f"{best_mult:.2f}x harmonic"
+    
+    aligned_arr = np.asarray(aligned_periods, dtype=float)
+    
+    # Check if aligned periods agree (within 5%)
+    if len(aligned_arr) > 1:
+        median_p = float(np.median(aligned_arr))
+        agreement_mask = np.abs(aligned_arr - median_p) / median_p < 0.05
+        n_agree = int(np.sum(agreement_mask))
+        
+        if n_agree >= 2:
+            # Use only agreeing periods for consensus
+            consensus_period = float(np.average(aligned_arr[agreement_mask], 
+                                                weights=w_arr[agreement_mask]))
+        else:
+            # Fall back to weighted average of aligned periods
+            consensus_period = float(np.average(aligned_arr, weights=w_arr))
+    else:
+        consensus_period = float(aligned_arr[0])
+
     harmonics = check_harmonics(p_arr, consensus_period)
+    harmonics["alignment_applied"] = harmonic_info
 
     return {
         "period": consensus_period,
-        "period_std": float(np.nanstd(p_arr)),
+        "period_std": float(np.nanstd(aligned_arr)),
         "method_agreement": int(len(p_arr)),
         "weights": w_arr.tolist(),
         "individual_periods": p_arr.tolist(),
+        "aligned_periods": aligned_arr.tolist(),
         "harmonics_detected": harmonics,
-        "is_harmonic": bool(harmonics.get("is_harmonic", False)),
+        "is_harmonic": bool(len(harmonic_info) > 0),
     }
 
 
