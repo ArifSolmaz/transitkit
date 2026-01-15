@@ -427,6 +427,52 @@ def create_transit_report_figure(time, flux, params, filename=None, dpi=300, for
     return fig
 
 
+def plot_residuals(ax, time, residuals, color="k", alpha=0.6, ms=2):
+    """
+    Plot fit residuals.
+
+    Parameters
+    ----------
+    ax : matplotlib.axes.Axes
+        Axes to plot on
+    time : array
+        Time array
+    residuals : array
+        Residual values (data - model)
+    color : str
+        Point color
+    alpha : float
+        Point transparency
+    ms : int
+        Marker size
+
+    Returns
+    -------
+    ax : matplotlib.axes.Axes
+    """
+    ax.plot(time, residuals, ".", color=color, alpha=alpha, markersize=ms)
+    ax.axhline(0, color="r", linestyle="--", alpha=0.5, linewidth=1)
+
+    # Add statistics
+    rms = np.std(residuals)
+    ax.text(
+        0.02,
+        0.98,
+        f"RMS: {rms:.2e}",
+        transform=ax.transAxes,
+        fontsize=9,
+        verticalalignment="top",
+        bbox=dict(boxstyle="round", facecolor="wheat", alpha=0.8),
+    )
+
+    ax.set_xlabel("Time (BJD - 2457000)")
+    ax.set_ylabel("Residuals")
+    ax.set_title("Fit Residuals")
+    ax.grid(True, alpha=0.3, linestyle=":")
+
+    return ax
+
+
 def create_parameter_table(ax, params):
     """
     Create parameter table for report.

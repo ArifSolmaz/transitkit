@@ -2903,11 +2903,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("BLS failed.")
-                    messagebox.showerror("BLS error", str(e))
+                    messagebox.showerror("BLS error", error_msg)
 
                 self.after(0, fail)
 
@@ -3009,11 +3010,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("Multiple methods failed.")
-                    self.console.error(f"Multiple methods error: {e}")
+                    self.console.error(f"Multiple methods error: {error_msg}")
 
                 self.after(0, fail)
 
@@ -3092,11 +3094,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("Validation failed.")
-                    self.console.error(f"Validation error: {e}")
+                    self.console.error(f"Validation error: {error_msg}")
 
                 self.after(0, fail)
 
@@ -3215,11 +3218,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("NEA failed.")
-                    messagebox.showerror("NEA error", str(e))
+                    messagebox.showerror("NEA error", error_msg)
 
                 self.after(0, fail)
 
@@ -3294,11 +3298,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("Search failed.")
-                    messagebox.showerror("Search error", str(e))
+                    messagebox.showerror("Search error", error_msg)
 
                 self.after(0, fail)
 
@@ -3440,11 +3445,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("Download failed.")
-                    messagebox.showerror("Download error", str(e))
+                    messagebox.showerror("Download error", error_msg)
 
                 self.after(0, fail)
 
@@ -3589,11 +3595,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("BLS failed.")
-                    messagebox.showerror("BLS error", str(e))
+                    messagebox.showerror("BLS error", error_msg)
 
                 self.after(0, fail)
 
@@ -3702,11 +3709,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("Advanced BLS failed.")
-                    self.console.error(f"Advanced BLS error: {e}")
+                    self.console.error(f"Advanced BLS error: {error_msg}")
 
                 self.after(0, fail)
 
@@ -3828,11 +3836,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("MCMC failed.")
-                    self.console.error(f"MCMC error: {e}")
+                    self.console.error(f"MCMC error: {error_msg}")
 
                 self.after(0, fail)
 
@@ -3914,11 +3923,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("TTV analysis failed.")
-                    self.console.error(f"TTV analysis error: {e}")
+                    self.console.error(f"TTV analysis error: {error_msg}")
 
                 self.after(0, fail)
 
@@ -4213,11 +4223,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("GP detrending failed.")
-                    self.console.error(f"GP detrending error: {e}")
+                    self.console.error(f"GP detrending error: {error_msg}")
 
                 self.after(0, fail)
 
@@ -4265,11 +4276,12 @@ For updates, bug reports, and contributions:
                 self.after(0, apply)
 
             except Exception as e:
+                error_msg = str(e)
 
                 def fail():
                     self._set_busy(False)
                     self.set_status("Significance calculation failed.")
-                    self.console.error(f"Significance calculation error: {e}")
+                    self.console.error(f"Significance calculation error: {error_msg}")
 
                 self.after(0, fail)
 
@@ -4369,11 +4381,12 @@ For updates, bug reports, and contributions:
                     self.after(0, apply)
 
                 except Exception as e:
+                    error_msg = str(e)
 
                     def fail():
                         self._set_busy(False)
                         self.set_status("Injection test failed.")
-                        self.console.error(f"Injection test error: {e}")
+                        self.console.error(f"Injection test error: {error_msg}")
 
                     self.after(0, fail)
 
