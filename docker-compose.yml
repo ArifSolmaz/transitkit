@@ -1,0 +1,12 @@
+version: '3.8'
+services:
+  transitkit:
+    build: .
+    volumes:
+      - ./data:/app/data
+  transitkit-dev:
+    build:
+      context: .
+      dockerfile: docker/development/Dockerfile
+    ports:
+      - "8888:8888"

@@ -1,0 +1,7 @@
+numpy>=1.21
+scipy>=1.8
+matplotlib>=3.5
+astropy>=5.1
+lightkurve>=2.3
+pandas>=1.4
+scikit-learn>=1.0

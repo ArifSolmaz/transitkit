@@ -1,0 +1,14 @@
+name: transitkit
+channels:
+  - conda-forge
+dependencies:
+  - python>=3.9
+  - numpy>=1.21
+  - scipy>=1.8
+  - matplotlib>=3.5
+  - astropy>=5.1
+  - pandas>=1.4
+  - scikit-learn>=1.0
+  - pip:
+    - lightkurve>=2.3
+    - emcee>=3.1
