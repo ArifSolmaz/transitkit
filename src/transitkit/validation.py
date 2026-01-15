@@ -7,6 +7,13 @@ import numpy as np
 from scipy import stats
 import warnings
 
+# Import core functions needed for validation tests
+from .core import (
+    generate_transit_signal_mandel_agol, 
+    add_noise, 
+    find_transits_bls_advanced
+)
+
 def validate_transit_parameters(params, time, flux):
     """
     Validate transit parameters against physical limits.

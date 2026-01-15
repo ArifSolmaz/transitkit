@@ -7,14 +7,25 @@ name = "transitkit"
 version = "2.0.0"
 description = "Professional Exoplanet Transit Light Curve Analysis Toolkit"
 readme = "README.md"
+license = {text = "MIT"}
 authors = [
-    { name = "Arif Solmaz", email = "arif.solmaz@gmail.com" }
+    {name = "Arif Solmaz", email = "arif.solmaz@gmail.com"}
 ]
 maintainers = [
-    { name = "TransitKit Research Team", email = "contact@transitkit.org" }
+    {name = "Arif Solmaz", email = "arif.solmaz@gmail.com"}
 ]
-license = { text = "MIT" }
-requires-python = ">=3.9"
+keywords = [
+    "exoplanet",
+    "transit",
+    "photometry",
+    "astronomy",
+    "astrophysics",
+    "TESS",
+    "Kepler",
+    "light-curve",
+    "BLS",
+    "TTV",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -27,186 +38,114 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Astronomy",
     "Topic :: Scientific/Engineering :: Physics",
-    "Framework :: Matplotlib",
-    "Natural Language :: English",
 ]
-
-keywords = [
-    "astronomy",
-    "exoplanets",
-    "transits",
-    "light-curves",
-    "tess",
-    "kepler",
-    "data-analysis",
-    "astrophysics",
-]
-
+requires-python = ">=3.9"
 dependencies = [
-    # Core scientific computing
-    "numpy>=1.24.0",
-    "scipy>=1.10.0",
-    "pandas>=2.0.0",
-    
-    # Astronomy
-    "astropy>=5.3.0",
-    "lightkurve>=2.5.0",
-    "astroquery>=0.4.7",
-    
-    # Statistics & Machine Learning
-    "emcee>=3.1.4",
-    "corner>=2.2.2",
-    "scikit-learn>=1.3.0",
-    "arviz>=0.16.0",
-    
-    # Visualization
-    "matplotlib>=3.7.0",
-    "seaborn>=0.12.0",
-    
-    # Data I/O
-    "h5py>=3.9.0",
-    "tables>=3.8.0",
-    "pyarrow>=14.0.0",
-    
-    # Utilities
-    "tqdm>=4.65.0",
-    "joblib>=1.3.0",
-    "pyyaml>=6.0",
-    "packaging>=23.1",
-    
-    # Advanced transit modeling (optional but recommended)
-    "batman-package>=2.4.9",
-    "ellc>=1.8.11",  # Fixed: Latest available version is 1.8.11
-    "rich>=13.5.0",
-    "click>=8.1.0",
+    "numpy>=1.21",
+    "scipy>=1.8",
+    "matplotlib>=3.5",
+    "astropy>=5.1",
+    "lightkurve>=2.3",
+    "pandas>=1.4",
+    "scikit-learn>=1.0",
+    "h5py>=3.6",
 ]
 
 [project.optional-dependencies]
-# Testing
-test = [
-    "pytest>=7.4.0",
-    "pytest-cov>=4.1.0",
-    "pytest-xdist>=3.5.0",
-    "pytest-mock>=3.11.0",
-    "pytest-timeout>=2.2.0",
-    "pytest-benchmark>=4.0.0",
-    "hypothesis>=6.85.0",
+mcmc = [
+    "emcee>=3.1",
+    "corner>=2.2",
 ]
-
-io = [
-  "h5py>=3.9.0",
-  "tables>=3.8.0",
-  "pyarrow>=14.0.0",
+cli = [
+    "click>=8.0",
+    "rich>=12.0",
 ]
-
-# Development tools
-dev = [
-    "black>=23.9.0",
-    "isort>=5.12.0",
-    "flake8>=6.1.0",
-    "mypy>=1.5.0",
-    "pre-commit>=3.4.0",
-    "ruff>=0.1.0",
-    "pylint>=3.0.0",
-    "jupyter>=1.0.0",
-    "ipython>=8.15.0",
+gui = [
+    "emcee>=3.1",
+    "corner>=2.2",
 ]
-
-# Documentation
-docs = [
-    "sphinx>=7.2.0",
-    "sphinx-rtd-theme>=2.0.0",
-    "myst-parser>=2.0.0",
-    "sphinx-autodoc-typehints>=1.25.0",
-    "sphinx-copybutton>=0.5.2",
-    "nbsphinx>=0.9.0",
-    "sphinx-gallery>=0.15.0",
-]
-
-# Advanced features
-advanced = [
-    "celerite2>=0.3.0",          # Fast Gaussian Processes
-    "exoplanet>=0.6.0",          # Exoplanet modeling with PyMC
-    "pymc>=5.7.0",               # Probabilistic programming
-    "tinygp>=0.3.0",             # Gaussian Processes
-    "jax>=0.4.0",                # Automatic differentiation
-    "jaxlib>=0.4.0",
-]
-
-# Ground-based observations
-ground = [
-    "ccdproc>=2.4.0",
-    "photutils>=1.8.0",
-    "astroalign>=2.4.0",
-    "astroplan>=0.9.0",
-    "astro-gala>=1.0.0",
-]
-
-# Performance optimization
-performance = [
-    "numba>=0.58.0",
-    "bottleneck>=1.3.7",
-    "numpy_groupies>=0.9.20",
-    "dask>=2023.9.0",
-    "zarr>=2.16.0",
-]
-
-# All extras
 all = [
-    "transitkit[test]",
-    "transitkit[dev]",
-    "transitkit[docs]",
-    "transitkit[advanced]",
-    "transitkit[ground]",
-    "transitkit[performance]",
+    "emcee>=3.1",
+    "corner>=2.2",
+    "click>=8.0",
+    "rich>=12.0",
+    "batman-package>=2.4",
+]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "black>=23.0",
+    "isort>=5.12",
+    "flake8>=6.0",
+    "mypy>=1.0",
+    "pre-commit>=3.0",
+]
+docs = [
+    "sphinx>=6.0",
+    "sphinx-rtd-theme>=1.2",
+    "myst-parser>=1.0",
+    "nbsphinx>=0.9",
 ]
 
 [project.urls]
 Homepage = "https://github.com/arifsolmaz/transitkit"
 Documentation = "https://transitkit.readthedocs.io"
-Repository = "https://github.com/arifsolmaz/transitkit.git"
+Repository = "https://github.com/arifsolmaz/transitkit"
 Issues = "https://github.com/arifsolmaz/transitkit/issues"
-Changelog = "https://github.com/arifsolmaz/transitkit/releases"
-"Cite this" = "https://doi.org/10.5281/zenodo.XXXXXXX"  # Update with your DOI
+Changelog = "https://github.com/arifsolmaz/transitkit/blob/main/CHANGELOG.md"
 
 [project.scripts]
 transitkit = "transitkit.cli:main"
+
+[project.gui-scripts]
 transitkit-gui = "transitkit.gui_app:main"
-transitkit-mcmc = "transitkit.cli:mcmc_command"
-transitkit-ttv = "transitkit.cli:ttv_command"
-
-[project.entry-points."transitkit.plugins"]
-bls = "transitkit.core:find_transits_bls_advanced"
-gls = "transitkit.core:find_period_gls"
-pdm = "transitkit.core:find_period_pdm"
-gp_detrend = "transitkit.analysis:detrend_light_curve_gp"
-export = "transitkit.io:export_transit_results"
-
-[tool.setuptools]
-package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
-include = ["transitkit*"]
-exclude = ["tests*"]
 
 [tool.setuptools.package-data]
-"transitkit" = [
-    "data/*.csv",
-    "data/*.json",
-    "data/*.h5",
-    "examples/*.py",
-    "examples/*.ipynb",
-    "*.cfg",
-    "*.yml",
+transitkit = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "network: marks tests that require network access",
+]
+filterwarnings = [
+    "ignore::UserWarning",
+    "ignore::DeprecationWarning",
 ]
 
-# Black configuration
+[tool.coverage.run]
+source = ["src/transitkit"]
+branch = true
+omit = [
+    "*/gui_app.py",
+    "*/__main__.py",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
 [tool.black]
-line-length = 88
-target-version = ['py39']
+line-length = 100
+target-version = ["py39", "py310", "py311", "py312"]
 include = '\.pyi?$'
-extend-exclude = '''
+exclude = '''
 /(
     \.eggs
   | \.git
@@ -221,112 +160,18 @@ extend-exclude = '''
 )/
 '''
 
-# Flake8 configuration
-[tool.flake8]
-max-line-length = 88
-extend-ignore = ["E203", "W503"]
-exclude = [".git", "__pycache__", "build", "dist", "*.egg-info"]
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["transitkit"]
+skip = [".venv", "build", "dist"]
 
-# Mypy configuration
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true
 warn_unused_configs = true
-disallow_untyped_defs = true
 ignore_missing_imports = true
-
-# Pytest configuration
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "--strict-markers",
-    "--strict-config",
-    "--tb=short",
-    "--cov=transitkit",
-    "--cov-report=term-missing",
-    "--cov-report=html",
-    "-v"
-]
-markers = [
-    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
-    "gui: marks tests as GUI tests",
-    "mcmc: marks tests as MCMC tests (can be slow)",
-    "requires_gpu: marks tests that require GPU",
-]
-
-# Coverage configuration
-[tool.coverage.run]
-source = ["transitkit"]
-omit = [
-    "*/tests/*",
-    "*/test_*.py",
-    "*/__pycache__/*",
-    "*/setup.py",
-    "*/conftest.py",
-]
-
-[tool.coverage.report]
-exclude_lines = [
-    "pragma: no cover",
-    "def __repr__",
-    "if self.debug:",
-    "if settings.DEBUG",
-    "raise AssertionError",
-    "raise NotImplementedError",
-    "if 0:",
-    "if __name__ == .__main__.:",
-    "class .*\bProtocol\\):",
-    "@(abc\\.)?abstractmethod",
-]
-
-# Version management
-[tool.bumpver]
-current_version = "2.0.0"
-version_pattern = "MAJOR.MINOR.PATCH"
-commit_message = "bump version {old_version} -> {new_version}"
-commit = true
-tag = true
-push = true
-
-[tool.bumpver.file_patterns]
-"pyproject.toml" = [
-    'current_version = "{version}"',
-]
-"src/transitkit/__init__.py" = [
-    '__version__ = "{version}"',
-]
-"README.md" = [
-    'transitkit-{version}',
-    'v{version}',
-]
-
-# Documentation build configuration
-[tool.sphinx]
-project = "TransitKit"
-version = "2.0.0"
-release = "2.0.0"
-master_doc = "index"
-language = "en"
-
-# Package metadata for PyPI
-[tool.pypi]
-description-file = "README.md"
-license-file = "LICENSE"
-home-page = "https://github.com/arifsolmaz/transitkit"
-keywords = "astronomy,exoplanets,transits,tess,kepler,data-analysis"
-classifiers = [
-    "Development Status :: 4 - Beta",
-    "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
-    "Programming Language :: Python :: 3",
-    "Topic :: Scientific/Engineering :: Astronomy",
-]
-requires-dist = [
-    "numpy>=1.24.0",
-    "scipy>=1.10.0",
-    "astropy>=5.3.0",
-    "matplotlib>=3.7.0",
+exclude = [
+    "gui_app.py",
+    "tests/",
 ]

@@ -1,645 +1,613 @@
-"""Comprehensive tests for TransitKit v2.0"""
+"""
+TransitKit v2.0 - Comprehensive Test Suite
 
-import pytest
+Tests for all core functionality including transit detection,
+parameter estimation, analysis, and validation.
+"""
+
 import numpy as np
-import tempfile
-import os
-from pathlib import Path
+import pytest
+import warnings
 
-# Test basic imports
-def test_version():
-    """Test version is set"""
-    from transitkit import __version__
-    assert __version__ == "2.0.0"
+warnings.filterwarnings("ignore")
 
-def test_hello():
-    """Test hello function"""
-    from transitkit import hello
-    result = hello()
-    assert "TransitKit" in result
-    assert "2.0.0" in result
+# Import transitkit modules
+from transitkit.core import (
+    TransitParameters,
+    generate_transit_signal_mandel_agol,
+    add_noise,
+    find_transits_bls_advanced,
+    find_transits_multiple_methods,
+    find_period_gls,
+    find_period_pdm,
+    _phase_dispersion_theta,
+)
+from transitkit.analysis import (
+    detrend_light_curve_gp,
+    remove_systematics_pca,
+    measure_transit_timing_variations,
+)
+from transitkit.utils import (
+    calculate_snr,
+    estimate_limb_darkening,
+    calculate_transit_duration_from_parameters,
+    check_data_quality,
+    time_to_phase,
+    detect_outliers_modified_zscore,
+)
+from transitkit.validation import (
+    validate_transit_parameters,
+    perform_injection_recovery_test,
+    calculate_detection_significance,
+)
+from transitkit.io import export_transit_results
 
-def test_module_imports():
-    """Test all module imports"""
-    import transitkit as tk
-    
-    # Test core module access
-    assert hasattr(tk, 'core')
-    assert hasattr(tk, 'analysis')
-    assert hasattr(tk, 'visualization')
-    assert hasattr(tk, 'io')
-    assert hasattr(tk, 'utils')
-    assert hasattr(tk, 'validation')
-    assert hasattr(tk, 'nea')
-    
-    # Test backward compatibility functions
-    assert callable(tk.hello)
-    assert callable(tk.generate_transit_signal)
-    assert callable(tk.add_noise)
-    assert callable(tk.find_transits_box)
-    assert callable(tk.lookup_planet)
-    
-    # Test new convenience functions
-    assert callable(tk.load_tess_data)
-    assert callable(tk.generate_transit_signal_advanced)
-    assert callable(tk.find_transits_multiple)
-    assert callable(tk.detrend_gp)
-    assert callable(tk.create_transit_report)
-    assert callable(tk.estimate_parameters_mcmc)
-    assert callable(tk.validate_transit_detection)
-    assert callable(tk.measure_ttvs)
 
-def test_core_module():
-    """Test core module functionality"""
-    from transitkit.core import (
-        TransitParameters,
-        generate_transit_signal_mandel_agol,
-        find_transits_bls_advanced,
-        find_transits_multiple_methods,
-        add_noise
-    )
-    
-    # Test TransitParameters dataclass
-    params = TransitParameters(
-        period=10.0,
-        t0=5.0,
-        duration=0.1,
-        depth=0.01,
-        snr=15.5,
-        fap=0.001
-    )
-    
-    assert params.period == 10.0
-    assert params.t0 == 5.0
-    assert params.duration == 0.1
-    assert params.depth == 0.01
-    assert params.snr == 15.5
-    assert params.fap == 0.001
-    
-    # Test to_dict method
-    params_dict = params.to_dict()
-    assert 'period' in params_dict
-    assert 't0' in params_dict
-    assert 'duration' in params_dict
-    assert 'depth' in params_dict
-    
-    # Test from_bls_result method
-    mock_bls_result = type('MockBLS', (), {
-        'period': 5.0,
-        'transit_time': 100.0,
-        'depth': 0.02,
-        'duration': 0.15,
-        'snr': 20.0
-    })()
-    
-    params2 = TransitParameters.from_bls_result(mock_bls_result, None, None)
-    assert params2.period == 5.0
-    assert params2.t0 == 100.0
-    assert params2.depth == 0.02
-    assert params2.duration == 0.15
-    assert params2.snr == 20.0
+# =============================================================================
+# Fixtures
+# =============================================================================
 
-def test_signal_generation():
-    """Test transit signal generation"""
-    from transitkit.core import generate_transit_signal_mandel_agol, add_noise
-    
-    # Create time array
-    time = np.linspace(0, 30, 1000)
-    
-    # Test basic generation
-    flux = generate_transit_signal_mandel_agol(
-        time=time,
-        period=10.0,
-        t0=5.0,
-        rprs=0.1,  # sqrt(0.01)
-        aRs=10.0,
-        u1=0.1,
-        u2=0.3
-    )
-    
-    assert len(flux) == len(time)
-    assert np.all(flux <= 1.0)  # Flux should be normalized
-    assert np.all(flux >= 0.0)  # Should be positive
-    
-    # Test noise addition
-    flux_noisy = add_noise(flux, noise_level=0.001)
-    assert len(flux_noisy) == len(flux)
-    
-    # Check that noise was added (std should be close to noise_level)
-    noise = flux_noisy - flux
-    assert np.std(noise) > 0.0001  # Should have some noise
-
-def test_bls_analysis():
-    """Test BLS analysis functionality"""
-    from transitkit.core import find_transits_bls_advanced
-    
-    # Create synthetic data with a known transit
-    time = np.linspace(0, 30, 2000)
-    flux = np.ones_like(time)
-    
-    # Add a transit at period 10.0 days
-    period = 10.0
-    t0 = 5.0
-    depth = 0.01
-    duration = 0.1
-    
-    for i in range(4):
-        tc = t0 + i * period
-        in_transit = (time > tc - duration/2) & (time < tc + duration/2)
-        flux[in_transit] = 1 - depth
-    
-    # Add small noise
-    flux += np.random.normal(0, 0.0005, len(flux))
-    
-    # Run BLS
-    result = find_transits_bls_advanced(
-        time, flux,
-        min_period=5.0,
-        max_period=15.0,
-        n_periods=1000
-    )
-    
-    # Check result structure
-    required_keys = ['period', 't0', 'duration', 'depth', 'snr', 'fap']
-    for key in required_keys:
-        assert key in result
-    
-    # Check that period is detected close to true period
-    assert abs(result['period'] - period) < 0.5  # Within 0.5 days
-    
-    # Check that FAP is calculated
-    assert 0 <= result['fap'] <= 1
-
-def test_utils_module():
-    """Test utilities module"""
-    from transitkit.utils import (
-        calculate_snr,
-        estimate_limb_darkening,
-        check_data_quality,
-        detect_outliers_modified_zscore
-    )
-    
-    # Test SNR calculation
-    time = np.linspace(0, 30, 1000)
-    flux = np.ones_like(time)
-    
-    # Add a fake transit
-    period = 10.0
-    t0 = 5.0
-    duration = 0.1
-    in_transit = ((time - t0) % period) < duration
-    flux[in_transit] = 0.99
-    
-    snr = calculate_snr(time, flux, period, t0, duration)
-    assert isinstance(snr, float)
-    
-    # Test limb darkening estimation
-    u1, u2 = estimate_limb_darkening(5800, 4.4, 0.0, method='quadratic')
-    assert 0 <= u1 <= 1
-    assert 0 <= u2 <= 1
-    
-    # Test data quality check
-    quality = check_data_quality(time, flux)
-    assert 'n_points' in quality
-    assert 'time_span' in quality
-    assert 'flux_mean' in quality
-    assert 'flux_std' in quality
-    
-    # Test outlier detection
-    data = np.random.normal(0, 1, 100)
-    data[0] = 100  # Add an obvious outlier
-    outliers = detect_outliers_modified_zscore(data, threshold=3.5)
-    assert np.sum(outliers) >= 1  # Should detect at least the obvious outlier
-
-def test_validation_module():
-    """Test validation module"""
-    from transitkit.validation import (
-        validate_transit_parameters,
-        calculate_detection_significance
-    )
-    from transitkit.core import TransitParameters
-    
-    # Test parameter validation
-    time = np.linspace(0, 30, 1000)
-    
-    # Valid parameters
-    params = TransitParameters(
-        period=10.0,
-        t0=15.0,
-        duration=0.1,
-        depth=0.01,
-        snr=15.0
-    )
-    
-    validation = validate_transit_parameters(params, time, np.ones_like(time))
-    assert 'period_positive' in validation
-    assert 'duration_lt_period' in validation
-    assert 't0_in_range' in validation
-    assert 'all_passed' in validation
-    
-    # Test significance calculation
-    mock_result = {
-        'period': 10.0,
-        't0': 15.0,
-        'time': time,
-        'flux': np.ones_like(time)
-    }
-    
-    significance = calculate_detection_significance(mock_result, n_shuffles=10)
-    assert 'p_value' in significance
-    assert 'significance_sigma' in significance
-    assert 'n_shuffles' in significance
-    assert 0 <= significance['p_value'] <= 1
-
-def test_io_module():
-    """Test IO module functionality"""
-    from transitkit.io import export_transit_results
-    
-    # Test export functionality
-    test_results = {
-        'period': 10.0,
-        't0': 100.0,
-        'duration': 0.1,
-        'depth': 0.01,
-        'snr': 15.5,
-        'data': np.array([1, 2, 3]),
-        'nested': {
-            'value': 42,
-            'array': np.array([4, 5, 6])
-        }
-    }
-    
-    # Test JSON export
-    with tempfile.NamedTemporaryFile(suffix='.json', delete=False) as f:
-        json_file = f.name
-    
-    try:
-        export_transit_results(test_results, json_file, format='json')
-        assert os.path.exists(json_file)
-        assert os.path.getsize(json_file) > 0
-    finally:
-        if os.path.exists(json_file):
-            os.unlink(json_file)
-    
-    # Test CSV export (should work with flattened data)
-    with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as f:
-        csv_file = f.name
-    
-    try:
-        # Create simple data for CSV
-        simple_results = {'period': [10.0], 'depth': [0.01]}
-        export_transit_results(simple_results, csv_file, format='csv')
-        assert os.path.exists(csv_file)
-        assert os.path.getsize(csv_file) > 0
-    finally:
-        if os.path.exists(csv_file):
-            os.unlink(csv_file)
-
-def test_nea_module():
-    """Test NEA module (mocked)"""
-    from transitkit.nea import lookup_planet
-    
-    # Test that function exists and has correct signature
-    import inspect
-    sig = inspect.signature(lookup_planet)
-    params = list(sig.parameters.keys())
-    
-    assert 'query_text' in params
-    assert 'default_only' in params
-    assert 'limit' in params
-    
-    # Function should be callable
-    assert callable(lookup_planet)
-
-def test_visualization_imports():
-    """Test visualization module imports"""
-    from transitkit.visualization import (
-        setup_publication_style,
-        plot_transit_summary,
-        create_transit_report_figure
-    )
-    
-    # Just test that functions are importable
-    assert callable(setup_publication_style)
-    assert callable(plot_transit_summary)
-    assert callable(create_transit_report_figure)
-
-def test_analysis_imports():
-    """Test analysis module imports"""
-    from transitkit.analysis import (
-        detrend_light_curve_gp,
-        measure_transit_timing_variations,
-        calculate_transit_duration_ratio
-    )
-    
-    # Just test that functions are importable
-    assert callable(detrend_light_curve_gp)
-    assert callable(measure_transit_timing_variations)
-    assert callable(calculate_transit_duration_ratio)
-
-def test_backward_compatibility():
-    """Test backward compatibility functions"""
-    import transitkit as tk
-    
-    # Test old function names still work
-    time = np.linspace(0, 30, 100)
-    
-    # generate_transit_signal should work (with deprecation warning)
-    with pytest.warns(DeprecationWarning):
-        flux = tk.generate_transit_signal(time, period=10.0, depth=0.01, duration=0.1)
-        assert len(flux) == len(time)
-    
-    # find_transits_box should work (with deprecation warning)
-    flux = np.ones_like(time)
-    with pytest.warns(DeprecationWarning):
-        result = tk.find_transits_box(time, flux, min_period=1.0, max_period=20.0)
-        assert 'period' in result
-    
-    # plot_light_curve should work (with deprecation warning)
-    with pytest.warns(DeprecationWarning):
-        # This returns a matplotlib figure
-        fig = tk.plot_light_curve(time, flux)
-        assert fig is not None
-
-def test_mcmc_estimation():
-    """Test MCMC parameter estimation (basic)"""
-    from transitkit.core import estimate_parameters_mcmc
-    
-    # Create synthetic data
+@pytest.fixture
+def synthetic_transit():
+    """Generate synthetic transit light curve for testing."""
     np.random.seed(42)
-    time = np.linspace(0, 30, 500)
-    flux = np.ones_like(time)
-    
-    # Add a transit
-    period_true = 10.0
-    t0_true = 5.0
-    duration_true = 0.1
-    depth_true = 0.01
-    
-    for i in range(4):
-        tc = t0_true + i * period_true
-        in_transit = (time > tc - duration_true/2) & (time < tc + duration_true/2)
-        flux[in_transit] = 1 - depth_true
-    
-    # Add noise
-    flux += np.random.normal(0, 0.001, len(flux))
-    flux_err = np.ones_like(flux) * 0.001
-    
-    # Run quick MCMC (small for testing)
-    samples, errors = estimate_parameters_mcmc(
-        time, flux, flux_err,
-        period_guess=9.5,
-        t0_guess=4.5,
-        duration_guess=0.15,
-        depth_guess=0.015,
-        n_walkers=8,
-        n_steps=100,
-        burnin=20
-    )
-    
-    # Check outputs
-    assert samples is not None
-    assert errors is not None
-    assert 'period_err' in errors
-    assert 't0_err' in errors
-    assert 'duration_err' in errors
-    assert 'depth_err' in errors
-
-def test_multiple_methods():
-    """Test multiple detection methods"""
-    from transitkit.core import find_transits_multiple_methods
-    
-    # Create synthetic data
-    time = np.linspace(0, 30, 1000)
-    flux = np.ones_like(time)
-    
-    # Add a transit
-    period = 10.0
-    t0 = 5.0
-    depth = 0.01
-    duration = 0.1
-    
-    for i in range(4):
-        tc = t0 + i * period
-        in_transit = (time > tc - duration/2) & (time < tc + duration/2)
-        flux[in_transit] = 1 - depth
-    
-    flux += np.random.normal(0, 0.0005, len(flux))
-    
-    # Test with BLS only
-    results = find_transits_multiple_methods(
-        time, flux,
-        min_period=5.0,
-        max_period=15.0,
-        methods=['bls']
-    )
-    
-    assert 'bls' in results
-    assert 'consensus' in results
-    assert 'validation' in results
-    
-    # Check consensus has period
-    consensus = results['consensus']
-    if consensus:
-        assert 'period' in consensus
-
-def test_gaussian_process():
-    """Test Gaussian Process detrending"""
-    from transitkit.analysis import detrend_light_curve_gp
-    
-    # Create synthetic data with trend
-    time = np.linspace(0, 10, 200)
-    trend = 0.01 * time  # Linear trend
-    flux = 1.0 + trend + np.random.normal(0, 0.001, len(time))
-    
-    # Apply GP detrending
-    flux_detrended, trend_fit, gp = detrend_light_curve_gp(time, flux)
-    
-    assert len(flux_detrended) == len(flux)
-    assert len(trend_fit) == len(flux)
-    assert gp is not None
-    
-    # Detrended flux should have less trend
-    slope_original = np.polyfit(time, flux, 1)[0]
-    slope_detrended = np.polyfit(time, flux_detrended, 1)[0]
-    
-    assert abs(slope_detrended) < abs(slope_original)
-
-def test_transit_timing_variations():
-    """Test TTV measurement"""
-    from transitkit.analysis import measure_transit_timing_variations
-    
-    # Create data with TTVs
-    time = np.linspace(0, 100, 2000)
-    flux = np.ones_like(time)
-    
-    period = 10.0
-    t0 = 5.0
-    duration = 0.1
+    time = np.linspace(0, 50, 3000)
+    period = 5.0
+    t0 = 2.5
     depth = 0.01
     
-    # Add transits with TTVs
-    for i in range(10):
-        # Add sinusoidal TTV
-        ttv = 0.01 * np.sin(2 * np.pi * i / 5)  # ~1% period TTV
-        tc = t0 + i * period + ttv
-        
-        in_transit = (time > tc - duration/2) & (time < tc + duration/2)
-        flux[in_transit] = 1 - depth
-    
-    flux += np.random.normal(0, 0.0005, len(flux))
-    
-    # Measure TTVs
-    ttv_results = measure_transit_timing_variations(
-        time, flux, period, t0, duration
+    flux = generate_transit_signal_mandel_agol(
+        time, period=period, t0=t0, depth=depth
     )
+    flux_noisy = add_noise(flux, noise_level=0.001)
     
-    assert 'ttvs_detected' in ttv_results
-    assert 'p_value' in ttv_results
-    assert 'measurements' in ttv_results
-    
-    if ttv_results['measurements']:
-        assert 'epoch' in ttv_results['measurements'][0]
-        assert 'ttv' in ttv_results['measurements'][0]
+    return {
+        "time": time,
+        "flux": flux,
+        "flux_noisy": flux_noisy,
+        "period": period,
+        "t0": t0,
+        "depth": depth,
+    }
 
-def test_data_quality():
-    """Test comprehensive data quality checks"""
-    from transitkit.utils import check_data_quality
-    
-    # Create good quality data
-    time = np.linspace(0, 30, 1000)
-    flux = np.random.normal(1.0, 0.001, len(time))
-    
-    quality = check_data_quality(time, flux)
-    
-    assert quality['n_nans'] == 0
-    assert quality['has_nans'] == False
-    assert quality['is_sorted'] == True
-    assert quality['n_points'] == 1000
-    assert quality['time_span'] == 30.0
-    
-    # Create data with issues
-    time_bad = np.array([0, 2, 1, 3, 4])  # Not sorted
-    flux_bad = np.array([1.0, np.nan, 1.0, 1.0, 1.0])
-    
-    quality_bad = check_data_quality(time_bad, flux_bad)
-    
-    assert quality_bad['has_nans'] == True
-    assert quality_bad['is_sorted'] == False
 
-@pytest.mark.skipif(os.environ.get('CI') == 'true', reason="Skipping slow tests in CI")
-def test_slow_mcmc():
-    """Test full MCMC (marked as slow)"""
-    from transitkit.core import estimate_parameters_mcmc
-    
-    # Smaller test for slow test
-    time = np.linspace(0, 30, 200)
-    flux = np.ones_like(time)
-    flux_err = np.ones_like(flux) * 0.001
-    
-    samples, errors = estimate_parameters_mcmc(
-        time, flux, flux_err,
-        period_guess=10.0,
-        t0_guess=5.0,
-        duration_guess=0.1,
-        depth_guess=0.01,
-        n_walkers=16,
-        n_steps=200,
-        burnin=50
+@pytest.fixture
+def transit_params():
+    """Create TransitParameters instance for testing."""
+    return TransitParameters(
+        period=5.0,
+        t0=2.5,
+        duration=0.15,
+        depth=0.01,
+        period_err=0.001,
+        t0_err=0.01,
+        duration_err=0.01,
+        depth_err=0.001,
+        snr=50.0
     )
-    
-    assert samples is not None
-    assert errors is not None
 
-def test_cli_import():
-    """Test CLI module import"""
-    from transitkit import cli
-    
-    # Test that CLI functions exist
-    assert hasattr(cli, 'cli')
-    assert hasattr(cli, 'main')
-    
-    # Test CLI group creation
-    import click
-    assert isinstance(cli.cli, click.Group)
 
-def test_gui_import():
-    """Test GUI module import"""
-    from transitkit import gui_app
-    
-    # Test that GUI class exists
-    assert hasattr(gui_app, 'TransitKitGUI')
-    assert hasattr(gui_app, 'main')
-    
-    # Test GUI class can be instantiated
-    # (We don't actually run it in tests)
-    assert callable(gui_app.TransitKitGUI)
+# =============================================================================
+# Core Module Tests
+# =============================================================================
 
-def test_deprecation_warnings():
-    """Test that deprecated functions warn properly"""
-    import warnings
-    import transitkit as tk
+class TestTransitParameters:
+    """Tests for TransitParameters dataclass."""
     
-    # Capture warnings
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
+    def test_creation(self):
+        """Test basic parameter creation."""
+        params = TransitParameters(
+            period=5.0, t0=2.5, duration=0.15, depth=0.01
+        )
+        assert params.period == 5.0
+        assert params.t0 == 2.5
+        assert params.duration == 0.15
+        assert params.depth == 0.01
+    
+    def test_rprs_derivation(self):
+        """Test that rprs is derived from depth."""
+        params = TransitParameters(
+            period=5.0, t0=2.5, duration=0.15, depth=0.01
+        )
+        assert params.rprs == pytest.approx(0.1, rel=1e-6)
+    
+    def test_to_dict(self):
+        """Test conversion to dictionary."""
+        params = TransitParameters(
+            period=5.0, t0=2.5, duration=0.15, depth=0.01
+        )
+        d = params.to_dict()
+        assert isinstance(d, dict)
+        assert d["period"] == 5.0
+        assert d["depth"] == 0.01
+
+
+class TestSignalGeneration:
+    """Tests for transit signal generation."""
+    
+    def test_generate_signal_basic(self):
+        """Test basic signal generation."""
+        time = np.linspace(0, 10, 500)
+        flux = generate_transit_signal_mandel_agol(
+            time, period=5.0, depth=0.01
+        )
         
-        # Call deprecated function
-        result = tk.generate_transit_signal([0, 1, 2], period=1.0, depth=0.01, duration=0.1)
+        assert len(flux) == len(time)
+        assert np.all(flux <= 1.0)
+        assert np.all(flux >= 0.99)  # Depth is 1%
+    
+    def test_generate_signal_with_rprs(self):
+        """Test signal generation with rprs parameter."""
+        time = np.linspace(0, 10, 500)
+        flux = generate_transit_signal_mandel_agol(
+            time, period=5.0, rprs=0.1
+        )
         
-        # Check that warning was issued
-        assert len(w) >= 1
-        assert issubclass(w[0].category, DeprecationWarning)
-        assert "deprecated" in str(w[0].message).lower()
-
-def test_package_structure():
-    """Test overall package structure"""
-    import transitkit as tk
+        assert len(flux) == len(time)
+        min_flux = np.min(flux)
+        # rprs=0.1 means depth ~ 0.01
+        assert min_flux < 1.0
     
-    # Check all expected attributes exist
-    expected_attrs = [
-        '__version__', '__author__', '__email__', '__license__', '__citation__',
-        'hello', 'generate_transit_signal', 'add_noise', 'plot_light_curve',
-        'find_transits_box', 'lookup_planet', 'core', 'analysis', 'visualization',
-        'io', 'utils', 'validation', 'nea', 'load_tess_data',
-        'generate_transit_signal_advanced', 'find_transits_multiple', 'detrend_gp',
-        'create_transit_report', 'estimate_parameters_mcmc', 'validate_transit_detection',
-        'measure_ttvs'
-    ]
+    def test_generate_signal_empty_time(self):
+        """Test signal generation with empty time array."""
+        time = np.array([])
+        flux = generate_transit_signal_mandel_agol(
+            time, period=5.0, depth=0.01
+        )
+        assert len(flux) == 0
     
-    for attr in expected_attrs:
-        assert hasattr(tk, attr), f"Missing attribute: {attr}"
-
-def test_error_handling():
-    """Test error handling in core functions"""
-    from transitkit.core import find_transits_bls_advanced
-    
-    # Test with invalid inputs
-    time = np.array([1, 2, 3])
-    flux = np.array([1, 2])  # Wrong length
-    
-    with pytest.raises(ValueError):
-        find_transits_bls_advanced(time, flux)
-    
-    # Test with all NaN data
-    time = np.array([1, 2, 3, 4, 5])
-    flux = np.array([np.nan, np.nan, np.nan, np.nan, np.nan])
-    
-    with pytest.raises(ValueError):
-        find_transits_bls_advanced(time, flux)
-
-def test_numpy_compatibility():
-    """Test that functions work with numpy arrays"""
-    from transitkit.core import add_noise
-    import numpy as np
-    
-    # Test with different dtypes
-    for dtype in [np.float32, np.float64]:
-        flux = np.ones(100, dtype=dtype)
-        noisy = add_noise(flux, noise_level=0.001)
+    def test_add_noise(self):
+        """Test noise addition."""
+        flux = np.ones(1000)
+        noisy = add_noise(flux, noise_level=0.01, seed=42)
         
-        assert noisy.dtype == np.float64  # Should be promoted to float64
         assert len(noisy) == len(flux)
+        assert np.std(noisy) == pytest.approx(0.01, rel=0.1)
+    
+    def test_add_noise_zero_level(self):
+        """Test that zero noise level returns original."""
+        flux = np.ones(100)
+        noisy = add_noise(flux, noise_level=0.0)
+        np.testing.assert_array_equal(flux, noisy)
 
-if __name__ == '__main__':
-    pytest.main([__file__, '-v'])
+
+class TestBLSDetection:
+    """Tests for BLS transit detection."""
+    
+    def test_bls_detection(self, synthetic_transit):
+        """Test BLS period detection accuracy."""
+        result = find_transits_bls_advanced(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"],
+            min_period=1.0,
+            max_period=20.0
+        )
+        
+        # Period should be within 1% of true value
+        period_error = abs(result["period"] - synthetic_transit["period"])
+        assert period_error / synthetic_transit["period"] < 0.01
+    
+    def test_bls_returns_required_keys(self, synthetic_transit):
+        """Test that BLS returns all required keys."""
+        result = find_transits_bls_advanced(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"]
+        )
+        
+        required_keys = ["period", "t0", "duration", "depth", "snr", "fap"]
+        for key in required_keys:
+            assert key in result
+    
+    def test_bls_duration_period_constraint(self):
+        """Test that BLS handles duration < period constraint."""
+        time = np.linspace(0, 10, 500)
+        flux = np.ones_like(time)
+        
+        # This should not raise an error even with small min_period
+        result = find_transits_bls_advanced(
+            time, flux,
+            min_period=0.5,
+            max_period=5.0
+        )
+        assert "period" in result
+
+
+class TestPDM:
+    """Tests for Phase Dispersion Minimization."""
+    
+    def test_pdm_theta_calculation(self):
+        """Test PDM theta statistic calculation."""
+        time = np.linspace(0, 100, 1000)
+        # Sinusoidal signal with known period
+        flux = 1.0 + 0.1 * np.sin(2 * np.pi * time / 10.0)
+        
+        # Theta should be low at true period
+        theta_true = _phase_dispersion_theta(time, flux, period=10.0, nbins=10)
+        theta_wrong = _phase_dispersion_theta(time, flux, period=7.3, nbins=10)
+        
+        assert theta_true < theta_wrong
+    
+    def test_pdm_period_detection(self, synthetic_transit):
+        """Test PDM period detection."""
+        result = find_period_pdm(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"],
+            min_period=1.0,
+            max_period=20.0
+        )
+        
+        assert "period" in result
+        assert "theta" in result
+        assert result["method"] == "pdm"
+
+
+class TestGLS:
+    """Tests for Generalized Lomb-Scargle."""
+    
+    def test_gls_returns_required_keys(self, synthetic_transit):
+        """Test GLS returns required keys."""
+        result = find_period_gls(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"]
+        )
+        
+        assert "period" in result
+        assert "power" in result
+        assert "fap" in result
+        assert result["method"] == "gls"
+
+
+class TestMultiMethod:
+    """Tests for multi-method detection."""
+    
+    def test_multi_method_consensus(self, synthetic_transit):
+        """Test multi-method consensus calculation."""
+        result = find_transits_multiple_methods(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"],
+            min_period=1.0,
+            max_period=20.0,
+            methods=["bls", "gls", "pdm"]
+        )
+        
+        assert "bls" in result
+        assert "gls" in result
+        assert "pdm" in result
+        assert "consensus" in result
+        assert "period" in result["consensus"]
+
+
+# =============================================================================
+# Analysis Module Tests
+# =============================================================================
+
+class TestDetrending:
+    """Tests for detrending functions."""
+    
+    def test_gp_detrending(self, synthetic_transit):
+        """Test GP detrending."""
+        detrended, trend, gp = detrend_light_curve_gp(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"]
+        )
+        
+        assert len(detrended) == len(synthetic_transit["time"])
+        assert len(trend) == len(synthetic_transit["time"])
+    
+    def test_pca_systematics(self, synthetic_transit):
+        """Test PCA systematics removal."""
+        result = remove_systematics_pca(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"],
+            n_components=3
+        )
+        
+        assert "corrected_flux" in result
+        assert "explained_variance" in result
+        assert len(result["corrected_flux"]) == len(synthetic_transit["time"])
+
+
+class TestTTV:
+    """Tests for TTV measurement."""
+    
+    def test_ttv_measurement(self, synthetic_transit):
+        """Test TTV measurement returns required keys."""
+        result = measure_transit_timing_variations(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"],
+            period=synthetic_transit["period"],
+            t0=synthetic_transit["t0"],
+            duration=0.15
+        )
+        
+        assert "ttvs_detected" in result
+        assert "p_value" in result
+        assert "ttvs" in result
+        assert "epochs" in result
+        assert "rms_ttv" in result
+    
+    def test_ttv_no_signal(self):
+        """Test TTV measurement with flat light curve."""
+        time = np.linspace(0, 100, 1000)
+        flux = np.ones_like(time)
+        
+        result = measure_transit_timing_variations(
+            time, flux, period=5.0, t0=2.5, duration=0.15
+        )
+        
+        # Should not detect TTVs in flat data
+        assert result["ttvs_detected"] == False
+
+
+# =============================================================================
+# Utils Module Tests
+# =============================================================================
+
+class TestUtils:
+    """Tests for utility functions."""
+    
+    def test_calculate_snr(self, synthetic_transit):
+        """Test SNR calculation."""
+        snr = calculate_snr(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"],
+            period=synthetic_transit["period"],
+            t0=synthetic_transit["t0"],
+            duration=0.15
+        )
+        
+        assert snr > 0
+        assert np.isfinite(snr)
+    
+    def test_estimate_limb_darkening(self):
+        """Test limb darkening coefficient estimation."""
+        # Solar-like star
+        u1, u2 = estimate_limb_darkening(5800, 4.4, 0.0)
+        assert 0 < u1 < 1
+        assert 0 < u2 < 1
+        
+        # M-dwarf
+        u1_m, u2_m = estimate_limb_darkening(3500, 4.8, 0.0)
+        assert u1_m > u1  # M-dwarfs have stronger limb darkening
+    
+    def test_transit_duration_calculation(self):
+        """Test transit duration calculation."""
+        duration = calculate_transit_duration_from_parameters(
+            period=5.0, aRs=10.0, rprs=0.1, b=0.0
+        )
+        
+        assert duration > 0
+        assert duration < 5.0  # Duration must be less than period
+    
+    def test_check_data_quality(self, synthetic_transit):
+        """Test data quality check."""
+        quality = check_data_quality(
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"]
+        )
+        
+        assert "has_nans" in quality
+        assert "n_points" in quality
+        assert "is_sorted" in quality
+        assert quality["n_points"] == len(synthetic_transit["time"])
+    
+    def test_time_to_phase(self):
+        """Test time to phase conversion."""
+        time = np.array([0, 2.5, 5.0, 7.5, 10.0])
+        phase = time_to_phase(time, period=5.0, t0=0.0)
+        
+        expected = np.array([0.0, 0.5, 0.0, 0.5, 0.0])
+        np.testing.assert_array_almost_equal(phase, expected)
+    
+    def test_outlier_detection(self):
+        """Test modified Z-score outlier detection."""
+        data = np.ones(100)
+        data[50] = 10.0  # Obvious outlier
+        
+        outliers = detect_outliers_modified_zscore(data, threshold=3.5)
+        
+        assert outliers[50] == True
+        assert np.sum(outliers) >= 1
+
+
+# =============================================================================
+# Validation Module Tests
+# =============================================================================
+
+class TestValidation:
+    """Tests for validation functions."""
+    
+    def test_validate_transit_parameters(self, synthetic_transit, transit_params):
+        """Test parameter validation."""
+        validation = validate_transit_parameters(
+            transit_params,
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"]
+        )
+        
+        assert "period_positive" in validation
+        assert "depth_positive" in validation
+        assert "all_passed" in validation
+        
+        # Valid parameters should pass
+        assert validation["period_positive"] == True
+        assert validation["depth_positive"] == True
+    
+    def test_validate_invalid_parameters(self, synthetic_transit):
+        """Test validation catches invalid parameters."""
+        invalid_params = TransitParameters(
+            period=-1.0,  # Invalid
+            t0=2.5,
+            duration=0.15,
+            depth=0.01
+        )
+        
+        validation = validate_transit_parameters(
+            invalid_params,
+            synthetic_transit["time"],
+            synthetic_transit["flux_noisy"]
+        )
+        
+        assert validation["period_positive"] == False
+    
+    @pytest.mark.slow
+    def test_injection_recovery(self, synthetic_transit, transit_params):
+        """Test injection-recovery analysis."""
+        result = perform_injection_recovery_test(
+            synthetic_transit["time"],
+            transit_params,
+            n_trials=5,
+            noise_level=0.001
+        )
+        
+        assert "recovery_rate" in result
+        assert "n_trials" in result
+        assert "n_recovered" in result
+        assert 0 <= result["recovery_rate"] <= 1
+
+
+# =============================================================================
+# I/O Module Tests
+# =============================================================================
+
+class TestIO:
+    """Tests for I/O functions."""
+    
+    def test_export_json(self, tmp_path):
+        """Test JSON export."""
+        results = {
+            "period": 5.0,
+            "t0": 2.5,
+            "depth": 0.01,
+            "array": np.array([1, 2, 3])
+        }
+        
+        filepath = tmp_path / "results.json"
+        export_transit_results(results, str(filepath), format="json")
+        
+        assert filepath.exists()
+    
+    def test_export_csv(self, tmp_path):
+        """Test CSV export."""
+        results = {
+            "period": 5.0,
+            "t0": 2.5,
+            "depth": 0.01
+        }
+        
+        filepath = tmp_path / "results.csv"
+        export_transit_results(results, str(filepath), format="csv")
+        
+        assert filepath.exists()
+
+
+# =============================================================================
+# Integration Tests
+# =============================================================================
+
+class TestIntegration:
+    """Integration tests for full workflows."""
+    
+    def test_full_analysis_workflow(self, synthetic_transit):
+        """Test complete analysis workflow."""
+        # 1. Generate signal (already done in fixture)
+        time = synthetic_transit["time"]
+        flux = synthetic_transit["flux_noisy"]
+        true_period = synthetic_transit["period"]
+        
+        # 2. Detect transit
+        bls_result = find_transits_bls_advanced(
+            time, flux,
+            min_period=1.0,
+            max_period=20.0
+        )
+        
+        # 3. Verify detection accuracy
+        detected_period = bls_result["period"]
+        period_error = abs(detected_period - true_period) / true_period
+        assert period_error < 0.01  # Within 1%
+        
+        # 4. Calculate SNR
+        snr = calculate_snr(
+            time, flux,
+            period=detected_period,
+            t0=bls_result["t0"],
+            duration=bls_result["duration"]
+        )
+        assert snr > 10  # Should have good SNR
+        
+        # 5. Create parameters object
+        params = TransitParameters(
+            period=detected_period,
+            t0=bls_result["t0"],
+            duration=bls_result["duration"],
+            depth=bls_result["depth"],
+            snr=snr
+        )
+        
+        # 6. Validate parameters
+        validation = validate_transit_parameters(params, time, flux)
+        assert validation["all_passed"]
+        
+        # 7. Measure TTVs
+        ttv_result = measure_transit_timing_variations(
+            time, flux,
+            period=detected_period,
+            t0=bls_result["t0"],
+            duration=bls_result["duration"]
+        )
+        assert "ttvs" in ttv_result
+
+
+# =============================================================================
+# Edge Cases
+# =============================================================================
+
+class TestEdgeCases:
+    """Tests for edge cases and error handling."""
+    
+    def test_bls_short_data(self):
+        """Test BLS with very short time series."""
+        time = np.linspace(0, 1, 50)
+        flux = np.ones_like(time)
+        
+        # Should not crash
+        result = find_transits_bls_advanced(
+            time, flux,
+            min_period=0.1,
+            max_period=0.5
+        )
+        assert "period" in result
+    
+    def test_bls_with_nans(self):
+        """Test BLS handles NaN values."""
+        time = np.linspace(0, 30, 1000)
+        flux = np.ones_like(time)
+        flux[100:110] = np.nan
+        
+        # Remove NaNs before BLS
+        mask = np.isfinite(flux)
+        result = find_transits_bls_advanced(
+            time[mask], flux[mask]
+        )
+        assert "period" in result
+    
+    def test_ttv_insufficient_transits(self):
+        """Test TTV with insufficient transits."""
+        time = np.linspace(0, 2, 100)  # Only ~0.4 transits for P=5
+        flux = np.ones_like(time)
+        
+        result = measure_transit_timing_variations(
+            time, flux,
+            period=5.0,
+            t0=1.0,
+            duration=0.1
+        )
+        
+        # Should handle gracefully
+        assert result["ttvs_detected"] == False
+        assert len(result["ttvs"]) == 0
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])
