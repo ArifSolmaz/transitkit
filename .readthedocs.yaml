@@ -1,6 +1,4 @@
 # Read the Docs configuration file
-# See https://docs.readthedocs.io/en/stable/config-file/v2.html
-
 version: 2
 
 build:
@@ -14,3 +12,12 @@ sphinx:
 python:
   install:
     - requirements: docs/requirements.txt
+```
+
+And make sure `docs/requirements.txt` exists:
+```
+sphinx>=6.0
+sphinx-rtd-theme>=1.2
+myst-parser>=1.0
+numpy
+astropy
