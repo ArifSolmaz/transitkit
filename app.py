@@ -455,60 +455,69 @@ def add_noise(flux, noise_level=0.001, stellar_var=0.0):
 
 
 def box_least_squares(time, flux, min_period=1.0, max_period=20.0, 
-                      n_periods=5000, duration_grid=None):
+                      n_periods=500, n_durations=5):
     """
-    Box Least Squares (BLS) transit detection algorithm.
+    Optimized Box Least Squares (BLS) transit detection algorithm.
     """
-    if duration_grid is None:
-        duration_grid = np.linspace(0.01, 0.2, 20)
-    
     periods = np.linspace(min_period, max_period, n_periods)
     power = np.zeros(len(periods))
     best_params = {'period': 0, 'depth': 0, 't0': 0, 'duration': 0, 'snr': 0}
     max_power = 0
     
     flux_norm = flux - np.median(flux)
+    n_bins = 50  # Fixed bin count for speed
+    
+    # Pre-compute duration grid
+    duration_fracs = np.linspace(0.01, 0.15, n_durations)
     
     for i, period in enumerate(periods):
-        for duration in duration_grid:
-            n_bins = max(10, int(period / duration * 2))
-            phase = (time % period) / period
+        phase = (time % period) / period
+        
+        # Bin the data using histogram (vectorized)
+        bin_edges = np.linspace(0, 1, n_bins + 1)
+        bin_sums = np.zeros(n_bins)
+        bin_counts = np.zeros(n_bins)
+        
+        bin_idx = np.clip(np.floor(phase * n_bins).astype(int), 0, n_bins - 1)
+        np.add.at(bin_sums, bin_idx, flux_norm)
+        np.add.at(bin_counts, bin_idx, 1)
+        
+        # Avoid division by zero
+        valid = bin_counts > 0
+        bin_flux = np.zeros(n_bins)
+        bin_flux[valid] = bin_sums[valid] / bin_counts[valid]
+        
+        # Test different transit durations
+        for dur_frac in duration_fracs:
+            n_transit_bins = max(1, int(dur_frac * n_bins))
             
-            # Bin the data
-            bin_edges = np.linspace(0, 1, n_bins + 1)
-            bin_flux = np.zeros(n_bins)
-            bin_counts = np.zeros(n_bins)
+            # Slide transit window using convolution (fast)
+            kernel = np.ones(n_transit_bins) / n_transit_bins
+            transit_mean = np.convolve(bin_flux, kernel, mode='same')
             
-            for j in range(n_bins):
-                mask = (phase >= bin_edges[j]) & (phase < bin_edges[j+1])
-                if np.sum(mask) > 0:
-                    bin_flux[j] = np.mean(flux_norm[mask])
-                    bin_counts[j] = np.sum(mask)
+            # Out-of-transit mean
+            total_mean = np.mean(bin_flux)
             
-            # Slide box through phase
-            n_in_transit = max(1, int(duration / period * n_bins))
+            # Depth estimate at each phase
+            depth_est = total_mean - transit_mean
             
-            for start in range(n_bins):
-                indices = [(start + k) % n_bins for k in range(n_in_transit)]
-                in_transit = bin_flux[indices]
-                out_transit = np.delete(bin_flux, indices)
+            # Best depth for this period/duration
+            best_idx = np.argmax(depth_est)
+            if depth_est[best_idx] > 0:
+                sr = depth_est[best_idx]**2 * n_transit_bins
+                if sr > power[i]:
+                    power[i] = sr
                 
-                if len(out_transit) > 0 and len(in_transit) > 0:
-                    depth_est = np.mean(out_transit) - np.mean(in_transit)
-                    if depth_est > 0:
-                        sr = depth_est**2 * np.sum(bin_counts[indices])
-                        power[i] = max(power[i], sr)
-                        
-                        if sr > max_power:
-                            max_power = sr
-                            best_params['period'] = period
-                            best_params['depth'] = depth_est
-                            best_params['t0'] = bin_edges[start] * period
-                            best_params['duration'] = duration
+                if sr > max_power:
+                    max_power = sr
+                    best_params['period'] = period
+                    best_params['depth'] = depth_est[best_idx]
+                    best_params['t0'] = bin_edges[best_idx] * period
+                    best_params['duration'] = dur_frac * period
     
     # Calculate SNR
     noise = median_abs_deviation(flux_norm) * 1.4826
-    if noise > 0:
+    if noise > 0 and best_params['period'] > 0:
         best_params['snr'] = best_params['depth'] / noise * np.sqrt(
             len(time) * best_params['duration'] / best_params['period']
         )
@@ -520,29 +529,33 @@ def box_least_squares(time, flux, min_period=1.0, max_period=20.0,
     }
 
 
-def generalized_lomb_scargle(time, flux, min_period=1.0, max_period=20.0, n_periods=5000):
+def generalized_lomb_scargle(time, flux, min_period=1.0, max_period=20.0, n_periods=500):
     """
-    Generalized Lomb-Scargle periodogram.
+    Optimized Generalized Lomb-Scargle periodogram.
     """
     periods = np.linspace(min_period, max_period, n_periods)
     frequencies = 1.0 / periods
     
     # Normalize flux
     flux_norm = flux - np.mean(flux)
+    var = np.var(flux_norm)
     
     power = np.zeros(len(frequencies))
     
     for i, freq in enumerate(frequencies):
         omega = 2 * np.pi * freq
+        wt = omega * time
         
-        # Calculate tau (time offset)
-        sin2 = np.sum(np.sin(2 * omega * time))
-        cos2 = np.sum(np.cos(2 * omega * time))
-        tau = np.arctan2(sin2, cos2) / (2 * omega)
+        # Vectorized calculations
+        cos_wt = np.cos(wt)
+        sin_wt = np.sin(wt)
         
-        # Calculate power
-        cos_term = np.cos(omega * (time - tau))
-        sin_term = np.sin(omega * (time - tau))
+        # Calculate tau
+        tau = np.arctan2(np.sum(np.sin(2 * wt)), np.sum(np.cos(2 * wt))) / (2 * omega)
+        
+        wt_tau = omega * (time - tau)
+        cos_term = np.cos(wt_tau)
+        sin_term = np.sin(wt_tau)
         
         cc = np.sum(cos_term**2)
         ss = np.sum(sin_term**2)
@@ -553,53 +566,55 @@ def generalized_lomb_scargle(time, flux, min_period=1.0, max_period=20.0, n_peri
             power[i] = 0.5 * (yc**2 / cc + ys**2 / ss)
     
     # Normalize
-    power = power / np.var(flux_norm)
+    if var > 0:
+        power = power / var
     
     # Find best period
     best_idx = np.argmax(power)
-    best_period = periods[best_idx]
     
     return {
         'periods': periods,
-        'power': power,
-        'period': best_period,
-        'power_max': power[best_idx]
+        'power': power / np.max(power) if np.max(power) > 0 else power,
+        'period': periods[best_idx],
+        'power_max': power[best_idx] / np.max(power) if np.max(power) > 0 else 0
     }
 
 
 def phase_dispersion_minimization(time, flux, min_period=1.0, max_period=20.0, 
-                                   n_periods=2000, n_bins=10):
+                                   n_periods=500, n_bins=10):
     """
-    Phase Dispersion Minimization (PDM) algorithm.
+    Optimized Phase Dispersion Minimization (PDM) algorithm.
     """
     periods = np.linspace(min_period, max_period, n_periods)
-    theta = np.zeros(len(periods))
+    theta = np.ones(len(periods))
     
     total_var = np.var(flux)
+    if total_var == 0:
+        return {'periods': periods, 'theta': theta, 'power': np.zeros(len(periods)), 
+                'period': periods[0], 'theta_min': 1.0}
     
     for i, period in enumerate(periods):
         phase = (time % period) / period
         
-        # Calculate dispersion in bins
+        # Use digitize for fast binning
         bin_edges = np.linspace(0, 1, n_bins + 1)
-        bin_var = []
-        bin_n = []
+        bin_idx = np.digitize(phase, bin_edges) - 1
+        bin_idx = np.clip(bin_idx, 0, n_bins - 1)
         
-        for j in range(n_bins):
-            mask = (phase >= bin_edges[j]) & (phase < bin_edges[j+1])
-            if np.sum(mask) > 1:
-                bin_var.append(np.var(flux[mask]))
-                bin_n.append(np.sum(mask))
+        # Calculate variance in each bin
+        weighted_var = 0
+        total_weight = 0
         
-        if len(bin_var) > 0:
-            # Weighted variance
-            weights = np.array(bin_n) - 1
-            if np.sum(weights) > 0:
-                theta[i] = np.sum(np.array(bin_var) * weights) / np.sum(weights) / total_var
-            else:
-                theta[i] = 1.0
-        else:
-            theta[i] = 1.0
+        for b in range(n_bins):
+            mask = bin_idx == b
+            n_in_bin = np.sum(mask)
+            if n_in_bin > 1:
+                bin_var = np.var(flux[mask])
+                weighted_var += bin_var * (n_in_bin - 1)
+                total_weight += n_in_bin - 1
+        
+        if total_weight > 0:
+            theta[i] = weighted_var / total_weight / total_var
     
     # Best period has minimum theta
     best_idx = np.argmin(theta)
@@ -607,7 +622,7 @@ def phase_dispersion_minimization(time, flux, min_period=1.0, max_period=20.0,
     return {
         'periods': periods,
         'theta': theta,
-        'power': 1 - theta,  # Convert to power-like metric
+        'power': 1 - theta,
         'period': periods[best_idx],
         'theta_min': theta[best_idx]
     }
@@ -735,10 +750,11 @@ def injection_recovery_test(time, n_injections=50, period_range=(1, 15),
                                        depth=true_depth)
         flux_noisy = add_noise(flux, noise_level=noise_level)
         
-        # Try to detect
+        # Try to detect (use fewer periods for speed)
         bls_result = box_least_squares(time, flux_noisy, 
                                        min_period=period_range[0], 
-                                       max_period=period_range[1])
+                                       max_period=period_range[1],
+                                       n_periods=300)
         
         # Check if recovered
         period_match = np.abs(bls_result['period'] - true_period) / true_period < 0.02
@@ -1310,11 +1326,46 @@ def page_multi_method(noise_level, observation_days, cadence):
                                  default=['bls', 'gls', 'pdm'])
     
     if st.button("🚀 Run Detection", type="primary"):
-        with st.spinner("Running period detection algorithms..."):
-            results = find_transits_multiple_methods(time, flux, 
-                                                     min_period=min_period,
-                                                     max_period=max_period,
-                                                     methods=methods)
+        progress = st.progress(0, text="Starting detection...")
+        
+        results = {}
+        n_methods = len(methods)
+        
+        for idx, method in enumerate(methods):
+            progress.progress((idx) / n_methods, text=f"Running {method.upper()}...")
+            
+            if method == 'bls':
+                results['bls'] = box_least_squares(time, flux, min_period, max_period)
+            elif method == 'gls':
+                results['gls'] = generalized_lomb_scargle(time, flux, min_period, max_period)
+            elif method == 'pdm':
+                results['pdm'] = phase_dispersion_minimization(time, flux, min_period, max_period)
+        
+        progress.progress(0.9, text="Calculating consensus...")
+        
+        # Calculate consensus
+        periods = []
+        weights = []
+        
+        if 'bls' in results:
+            periods.append(results['bls']['period'])
+            weights.append(max(results['bls'].get('snr', 1), 1))
+        if 'gls' in results:
+            periods.append(results['gls']['period'])
+            weights.append(results['gls']['power_max'] * 10 + 1)
+        if 'pdm' in results:
+            periods.append(results['pdm']['period'])
+            weights.append((1 - results['pdm']['theta_min']) * 10 + 1)
+        
+        results['consensus'] = {
+            'period': np.average(periods, weights=weights) if periods else 0,
+            'period_std': np.std(periods) if len(periods) > 1 else 0,
+            'periods': periods,
+            'weights': weights
+        }
+        
+        progress.progress(1.0, text="Done!")
+        progress.empty()
         
         st.session_state['detection_results'] = results
         
@@ -1528,7 +1579,7 @@ def page_injection_recovery(noise_level, observation_days, cadence):
     col1, col2, col3 = st.columns(3)
     
     with col1:
-        n_injections = st.slider("Number of Injections", 20, 200, 50, 10)
+        n_injections = st.slider("Number of Injections", 10, 100, 30, 5)
     with col2:
         period_range = st.slider("Period Range (days)", 1.0, 20.0, (1.0, 15.0))
     with col3:
