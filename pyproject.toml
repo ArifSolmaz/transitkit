@@ -132,6 +132,7 @@ Changelog = "https://github.com/arifsolmaz/transitkit/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+include = ["transitkit*"]
 
 [tool.setuptools.dynamic]
 version = {attr = "transitkit.__version__.__version__"}
