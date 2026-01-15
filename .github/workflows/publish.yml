@@ -70,6 +70,11 @@ jobs:
           python -c "import transitkit; print(f'TransitKit v{transitkit.__version__}')"
           python -c "from transitkit.core import generate_transit_signal_mandel_agol; print('Core module OK')"
           python -c "from transitkit.analysis import measure_transit_timing_variations; print('Analysis module OK')"
+          python -c "from transitkit.universal import UniversalTarget; print('Universal module OK')"
+          python -c "from transitkit.missions import MultiMissionDownloader; print('Missions module OK')"
+          python -c "from transitkit.spectroscopy import JWSTSpectroscopy; print('Spectroscopy module OK')"
+          python -c "from transitkit.ml import MLTransitDetector; print('ML module OK')"
+          python -c "from transitkit.publication import PublicationGenerator; print('Publication module OK')"
 
   publish-test-pypi:
     runs-on: ubuntu-latest

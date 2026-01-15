@@ -1,316 +1,305 @@
-# TransitKit v2.0
+# TransitKit v3.0 "Universal"
 
-[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://github.com/arifsolmaz/transitkit/actions/workflows/tests.yml/badge.svg)](https://github.com/arifsolmaz/transitkit/actions/workflows/tests.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://transitkit.streamlit.app)
+## 🎯 The Magic: ANY Planet, ONE Line
 
-**Professional Exoplanet Transit Light Curve Analysis Toolkit**
+```python
+from transitkit import UniversalTarget
 
-TransitKit is a comprehensive Python package for analyzing exoplanet transit light curves. It provides publication-quality tools for transit detection, parameter estimation, validation, and visualization.
+# Literally ANY identifier works:
+target = UniversalTarget("WASP-39 b")           # Planet name
+target = UniversalTarget("TIC 374829238")       # TESS ID  
+target = UniversalTarget("TOI-700 d")           # TOI
+target = UniversalTarget("Kepler-442b")         # Kepler planet
+target = UniversalTarget("KIC 8191672")         # Kepler star
+target = UniversalTarget("KOI-7016.01")         # Kepler candidate
+target = UniversalTarget("EPIC 201912552")      # K2 target
+target = UniversalTarget("HD 209458 b")         # HD catalog
+target = UniversalTarget("GJ 1214 b")           # Gliese catalog
+target = UniversalTarget("TRAPPIST-1 e")        # Famous systems
+target = UniversalTarget("Proxima Centauri b")  # Proper names
+target = UniversalTarget("Gaia DR3 4050234234") # Gaia ID
+target = UniversalTarget("2MASS J12345678")     # 2MASS
+target = UniversalTarget("285.67 -32.54")       # RA/Dec coordinates
 
-## 🌐 Live Demo
+# Then just:
+target.analyze()      # Full pipeline
+target.export("paper/")  # Publication-ready
+```
 
-**Try the interactive web app:** [https://transitkit.streamlit.app](https://transitkit.streamlit.app)
+## 🌟 What It Does
 
-No installation required - explore TransitKit directly in your browser!
+**Input**: Any identifier you can think of  
+**Output**: Complete cross-matched data + analysis + publication materials
 
-## Features
+```
+🔍 Resolving: WASP-39 b
 
-### Core Analysis
+============================================================
+✅ Resolved: WASP-39 b
+============================================================
 
-* **Transit Signal Generation**: Mandel & Agol (2002) limb-darkened transit models via `batman`
-* **Period Detection**: Multiple methods (BLS, GLS, PDM) with consensus weighting
-* **Parameter Estimation**: MCMC-based fitting with full uncertainty quantification
-* **Transit Timing Variations**: Automatic TTV detection and analysis
+📋 Identifiers:
+   TIC: 192971669
+   Gaia DR3: 6718676574376532864
+   2MASS: J14292360-0322375
+   HD: --
 
-### Data Handling
+⭐ Host Star:
+   Teff: 5485 K
+   Radius: 0.939 R☉
+   Mass: 0.931 M☉
+   Distance: 215.1 pc
 
-* **TESS/Kepler Support**: Native `lightkurve` integration for space-based data
-* **Ground-based Data**: Flexible I/O for various formats (CSV, FITS, HDF5)
-* **NASA Exoplanet Archive**: Direct TAP queries for known planet parameters
+🪐 Planets (1 found):
+   WASP-39 b: P=4.0553d, Rp=12.63 R⊕
 
-### Validation & Quality
+📡 Available Data:
+   TESS: Sectors [14, 40, 41] (['2min'])
+   JWST: Programs ['1366', '2512'] (['NIRSPEC', 'MIRI'])
+   🌈 Transmission spectrum available!
+============================================================
+```
 
-* **Detection Significance**: Bootstrap FAP estimation
-* **Odd-Even Tests**: Eclipse depth consistency checks
-* **Injection-Recovery**: Detection efficiency assessment
-* **Secondary Eclipse**: False positive screening
+## 🚀 Features
 
-### Visualization
+### Universal Target Resolution
+- Cross-matches across **15+ catalogs** automatically
+- SIMBAD → NASA Exoplanet Archive → MAST → ExoFOP → TIC/KIC
+- Returns ALL known identifiers for your target
 
-* **Publication-Quality Plots**: AAS/Nature journal styles
-* **Interactive GUI**: Full-featured Tkinter application
-* **MCMC Diagnostics**: Corner plots and chain visualization
+### Multi-Mission Data Fusion
+```python
+# Get EVERYTHING available
+data = target.get_lightcurves()
 
-## Installation
+# Or be specific
+tess_data = target.get_lightcurves(missions=['TESS'])
+kepler_data = target.get_lightcurves(missions=['Kepler'])
 
-### Basic Installation
+# Stitch 10+ years of data together
+combined = data.stitch()  # Kepler (2009) + K2 + TESS (2024)
+print(f"Total baseline: {combined.total_timespan:.0f} days")
+```
+
+### JWST Spectroscopy
+```python
+# Automatic transmission spectrum retrieval
+spectrum = target.get_transmission_spectrum()
+
+# Molecule detection
+from transitkit import JWSTSpectroscopy
+jwst = JWSTSpectroscopy(target)
+molecules = jwst.detect_molecules()
+
+for m in molecules:
+    if m.detected:
+        print(f"  {m.molecule}: {m.significance:.1f}σ at {m.wavelength_range}")
+```
+
+### ML-Powered Detection
+```python
+from transitkit import MLTransitDetector
+
+# Works on ANY light curve
+detector = MLTransitDetector(target)
+candidates = detector.detect(time, flux)
+
+# Combines BLS + TLS + Neural Network
+# Returns vetted candidates with FP probabilities
+for c in candidates:
+    print(f"P={c.period:.4f}d  SNR={c.snr:.1f}  ML={c.ml_score:.2f}  FP={c.fp_probability:.0%}")
+```
+
+### One-Click Publication
+```python
+# Generate everything for your paper
+target.export("my_paper/")
+
+# Creates:
+# my_paper/
+# ├── paper.tex           # Complete skeleton
+# ├── tables/
+# │   ├── stellar_params.tex
+# │   └── planet_params.tex
+# └── figures/
+#     ├── lightcurve.pdf
+#     ├── transit.pdf
+#     └── transmission.pdf
+```
+
+## 📦 Installation
 
 ```bash
+# Basic install
 pip install transitkit
+
+# Full install (ML + spectroscopy)
+pip install transitkit[full]
+
+# Development
+pip install transitkit[dev]
 ```
 
-### With All Features
+### Dependencies
 
-```bash
-pip install "transitkit[full]"
+**Core** (auto-installed):
+- numpy, astropy, astroquery, lightkurve, matplotlib
+
+**Optional**:
+- `transitleastsquares` - TLS detection
+- `tensorflow` - ML classification  
+- `petitRADTRANS` - Atmospheric retrieval
+- `emcee` - MCMC fitting
+
+## 🎓 Examples
+
+### Example 1: Quick Look at Any Target
+```python
+from transitkit import quick_look
+
+# Just see what's available
+quick_look("TOI-700 d")
+quick_look("TIC 259377017") 
+quick_look("Kepler-62f")
 ```
 
-### Development Installation
+### Example 2: Full Analysis Pipeline
+```python
+from transitkit import UniversalTarget
 
-```bash
-git clone https://github.com/arifsolmaz/transitkit.git
-cd transitkit
-pip install -e ".[dev,full]"
+target = UniversalTarget("HAT-P-11 b")
+
+# Run everything
+results = target.analyze()
+
+print(f"Light curves: {len(results['lightcurves'])}")
+print(f"Candidates: {len(results['candidates'])}")
+print(f"Best: P={results['candidates'][0].period:.4f}d")
 ```
 
-### Optional Dependencies
+### Example 3: Hunt for New Planets
+```python
+from transitkit import UniversalTarget, MLTransitDetector
 
-| Extra | Packages | Use Case |
-| --- | --- | --- |
-| `mcmc` | emcee, corner | MCMC parameter estimation |
-| `cli` | click, rich | Command-line interface |
-| `full` | All above + batman | Full functionality |
-| `dev` | pytest, black, etc. | Development |
-| `docs` | sphinx, etc. | Documentation building |
+# Pick any TIC ID
+target = UniversalTarget("TIC 12345678")
 
-## Interactive Streamlit App
+# Download all data
+lcs = target.get_lightcurves()
 
-TransitKit includes a Streamlit web app for interactive exploration:
-
-### 🌐 Online (No Installation)
-
-Visit **[https://transitkit.streamlit.app](https://transitkit.streamlit.app)**
-
-### 💻 Run Locally
-
-```bash
-pip install streamlit plotly scipy
-streamlit run app.py
+# Search for transits
+detector = MLTransitDetector(target)
+for lc in lcs:
+    candidates = detector.detect(lc.time, lc.flux)
+    for c in candidates:
+        if c.ml_score > 0.8 and c.snr > 10:
+            print(f"🎯 Candidate! P={c.period:.4f}d Rp={c.rp_earth:.1f} R⊕")
 ```
 
-### App Features
+### Example 4: Multi-Mission Time Series
+```python
+from transitkit import UniversalTarget
 
-| Tab | Description |
-|-----|-------------|
-| 🌟 **Synthetic Transit** | Generate custom transits with adjustable parameters |
-| 🔬 **Multi-Method Detection** | Compare BLS, GLS, PDM detection algorithms |
-| ⏱️ **TTV Analysis** | Explore transit timing variations |
-| 📊 **Injection-Recovery** | Run detection efficiency tests |
-| 📖 **Documentation** | Quick start guide and API reference |
+# A target with Kepler + TESS data
+target = UniversalTarget("Kepler-442b")
 
-### Streamlit App Requirements
+# Get all missions
+data = target.get_lightcurves()
 
-```
-streamlit>=1.28.0
-numpy>=1.24.0
-pandas>=2.0.0
-plotly>=5.18.0
-scipy>=1.11.0
+print(f"Kepler: {len([l for l in data if l.mission=='Kepler'])} quarters")
+print(f"TESS: {len([l for l in data if l.mission=='TESS'])} sectors")
+
+# Stitch together for TTV analysis
+combined = data.stitch()
+print(f"Baseline: {combined.total_timespan/365:.1f} years!")
 ```
 
-## Quick Start
+### Example 5: JWST Atmospheric Analysis
+```python
+from transitkit import UniversalTarget, JWSTSpectroscopy
 
-### Basic Transit Detection
+target = UniversalTarget("WASP-39 b")
+jwst = JWSTSpectroscopy(target)
+
+# Get transmission spectrum
+spectrum = jwst.get_transmission_spectrum()
+
+# Detect molecules
+molecules = jwst.detect_molecules(spectrum)
+print("Detected molecules:")
+for m in molecules[:5]:
+    if m.detected:
+        print(f"  {m.molecule}: {m.significance:.1f}σ")
+
+# Fit atmosphere (requires petitRADTRANS)
+atm = jwst.fit_atmosphere(spectrum)
+print(f"T_eq = {atm.temperature} K")
+```
+
+## 🔧 API Reference
+
+### UniversalTarget
+
+The main class - accepts ANY identifier.
 
 ```python
-import numpy as np
-from transitkit.core import (
-    generate_transit_signal_mandel_agol,
-    find_transits_bls_advanced,
-    add_noise
-)
+target = UniversalTarget(identifier, verbose=True)
 
-# Generate synthetic data
-time = np.linspace(0, 30, 2000)
-flux = generate_transit_signal_mandel_agol(
-    time, 
-    period=5.0, 
-    t0=2.5, 
-    depth=0.01  # 1% transit depth
-)
-flux_noisy = add_noise(flux, noise_level=0.001)
+# Properties
+target.ids          # CrossMatchedIDs - all catalog IDs
+target.stellar      # StellarParameters - host star
+target.planets      # List[PlanetParameters] - known planets
+target.available_data  # AvailableData - what missions have data
+target.tic          # Quick access to TIC ID
+target.kic          # Quick access to KIC ID
+target.coords       # (RA, Dec) tuple
 
-# Detect transit
-result = find_transits_bls_advanced(time, flux_noisy)
-print(f"Detected period: {result['period']:.4f} days")
-print(f"Transit depth: {result['depth']:.5f}")
-print(f"SNR: {result['snr']:.1f}")
+# Methods
+target.analyze()              # Full pipeline
+target.get_lightcurves()      # Download all LCs
+target.get_transmission_spectrum()  # JWST spectrum
+target.export(output_dir)     # Publication materials
+target.to_dict()             # Export as dict
+target.to_json(filepath)     # Export as JSON
 ```
 
-### Load TESS Data
+### Supported Identifiers
 
-```python
-from transitkit.io import load_tess_data_advanced
+| Format | Examples |
+|--------|----------|
+| Planet names | `WASP-39 b`, `HD 209458 b`, `GJ 1214 b` |
+| TIC | `TIC 12345678`, `TIC12345678` |
+| KIC | `KIC 8191672`, `Kepler-442` |
+| TOI | `TOI-700`, `TOI-700.01`, `TOI-700 d` |
+| KOI | `KOI-7016.01`, `K7016.01` |
+| EPIC | `EPIC 201912552`, `K2-18 b` |
+| HD | `HD 209458`, `HD 209458 b` |
+| HIP | `HIP 12345` |
+| Gaia | `Gaia DR3 12345678` |
+| 2MASS | `2MASS J12345678+1234567` |
+| Coordinates | `285.67 -32.54`, `19h12m34s -32d54m12s` |
 
-# Load TESS data for a known planet
-lc_collection = load_tess_data_advanced("TIC 25155310", sectors=[1, 2])
+## 🤝 Contributing
 
-# Process each sector
-for lc in lc_collection:
-    time = lc.time.value
-    flux = lc.flux.value
-    # Analyze...
-```
+Contributions welcome! See [CONTRIBUTING.md](CONTRIBUTING.md).
 
-### Multi-Method Analysis
+## 📄 License
 
-```python
-from transitkit.core import find_transits_multiple_methods
+MIT License - see [LICENSE](LICENSE).
 
-# Use BLS, GLS, and PDM together
-results = find_transits_multiple_methods(
-    time, flux,
-    min_period=1.0,
-    max_period=20.0,
-    methods=["bls", "gls", "pdm"]
-)
+## 📚 Citation
 
-print(f"BLS period: {results['bls']['period']:.4f} d")
-print(f"GLS period: {results['gls']['period']:.4f} d")
-print(f"PDM period: {results['pdm']['period']:.4f} d")
-print(f"Consensus: {results['consensus']['period']:.4f} d")
-```
-
-### TTV Analysis
-
-```python
-from transitkit.analysis import measure_transit_timing_variations
-
-ttv_result = measure_transit_timing_variations(
-    time, flux,
-    period=5.0,
-    t0=2.5,
-    duration=0.15
-)
-
-print(f"TTVs detected: {ttv_result['ttvs_detected']}")
-print(f"RMS TTV: {ttv_result['rms_ttv']*24*60:.2f} minutes")
-```
-
-### Publication-Quality Plots
-
-```python
-from transitkit.visualization import create_transit_report_figure, setup_publication_style
-from transitkit.core import TransitParameters
-
-params = TransitParameters(
-    period=5.0, period_err=0.001,
-    t0=2.5, t0_err=0.01,
-    duration=0.15, duration_err=0.01,
-    depth=0.01, depth_err=0.001,
-    snr=50.0
-)
-
-setup_publication_style(style='aas', dpi=300)
-fig = create_transit_report_figure(time, flux, params)
-fig.savefig('transit_report.pdf', bbox_inches='tight')
-```
-
-## Command-Line Interface
-
-> **Note:** CLI requires the `cli` extra: `pip install "transitkit[cli]"`
-
-```bash
-# Get version info
-transitkit version
-
-# Run BLS detection
-transitkit analyze detect lightcurve.csv --method bls --min-period 1 --max-period 20
-```
-
-## GUI Application
-
-```bash
-# Launch the GUI (requires: pip install "transitkit[full]")
-python -m transitkit.gui_app
-```
-
-Or from Python:
-
-```python
-from transitkit.gui_app import main
-main()
-```
-
-## API Reference
-
-### Core Module (`transitkit.core`)
-
-| Function | Description |
-| --- | --- |
-| `generate_transit_signal_mandel_agol()` | Generate limb-darkened transit model |
-| `find_transits_bls_advanced()` | Box Least Squares with SNR/FAP |
-| `find_transits_multiple_methods()` | Multi-method consensus detection |
-| `find_period_gls()` | Generalized Lomb-Scargle |
-| `find_period_pdm()` | Phase Dispersion Minimization |
-| `estimate_parameters_mcmc()` | MCMC parameter estimation |
-| `add_noise()` | Add Gaussian noise to flux |
-
-### Analysis Module (`transitkit.analysis`)
-
-| Function | Description |
-| --- | --- |
-| `detrend_light_curve_gp()` | Gaussian Process detrending |
-| `remove_systematics_pca()` | PCA systematics removal |
-| `measure_transit_timing_variations()` | TTV measurement |
-| `fit_transit_time()` | Fit individual transit times |
-
-### Validation Module (`transitkit.validation`)
-
-| Function | Description |
-| --- | --- |
-| `validate_transit_parameters()` | Physical parameter validation |
-| `perform_injection_recovery_test()` | Detection efficiency test |
-| `calculate_detection_significance()` | Bootstrap significance |
-| `validate_against_secondary_eclipse()` | Secondary eclipse check |
-
-### I/O Module (`transitkit.io`)
-
-| Function | Description |
-| --- | --- |
-| `load_tess_data_advanced()` | Load TESS light curves |
-| `load_kepler_data()` | Load Kepler/K2 data |
-| `load_ground_based_data()` | Load ground-based data |
-| `export_transit_results()` | Export results (JSON/CSV/HDF5) |
-
-## Citation
-
-If you use TransitKit in your research, please cite:
+If you use TransitKit in your research:
 
 ```bibtex
 @software{transitkit,
   author = {Solmaz, Arif},
-  title = {TransitKit: Professional Exoplanet Transit Analysis Toolkit},
-  year = {2025},
-  url = {https://github.com/arifsolmaz/transitkit},
-  version = {2.0.0}
+  title = {TransitKit: Universal Exoplanet Transit Analysis},
+  version = {3.0.0},
+  url = {https://github.com/arifsolmaz/transitkit}
 }
 ```
 
-## Contributing
+---
 
-Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-* [batman](https://github.com/lkreidberg/batman) for transit models
-* [lightkurve](https://github.com/lightkurve/lightkurve) for TESS/Kepler data access
-* [astropy](https://www.astropy.org/) for astronomical utilities
-* [emcee](https://github.com/dfm/emcee) for MCMC sampling
-* [Streamlit](https://streamlit.io/) for the interactive web application
-
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for version history.
+**TransitKit v3.0** - *Any planet. Any mission. One toolkit.*

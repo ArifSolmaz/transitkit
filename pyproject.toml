@@ -5,11 +5,25 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "transitkit"
 dynamic = ["version"]
-description = "Professional Exoplanet Transit Light Curve Analysis Toolkit"
+description = "Universal Exoplanet Transit Analysis Toolkit - Any Planet, Any Mission, One Line"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [{name = "Arif Solmaz", email = "arif.solmaz@gmail.com"}]
-keywords = ["exoplanet", "transit", "photometry", "astronomy", "TESS", "Kepler", "BLS", "TTV"]
+keywords = [
+    "exoplanet", 
+    "transit", 
+    "photometry", 
+    "astronomy", 
+    "TESS", 
+    "Kepler", 
+    "K2",
+    "JWST",
+    "BLS", 
+    "TLS",
+    "TTV",
+    "transmission-spectrum",
+    "atmospheric-retrieval",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Science/Research",
@@ -22,14 +36,90 @@ classifiers = [
     "Topic :: Scientific/Engineering :: Astronomy",
 ]
 requires-python = ">=3.9"
-dependencies = ["numpy>=1.21", "scipy>=1.8", "matplotlib>=3.5", "astropy>=5.1", "lightkurve>=2.3", "pandas>=1.4", "scikit-learn>=1.0", "seaborn>=0.12", "h5py>=3.6", "streamlit>=1.24"]
+
+dependencies = [
+    # Core
+    "numpy>=1.21",
+    "scipy>=1.8",
+    "matplotlib>=3.5",
+    "pandas>=1.4",
+    
+    # Astronomy
+    "astropy>=5.1",
+    "astroquery>=0.4.6",
+    "lightkurve>=2.3",
+    
+    # Analysis
+    "scikit-learn>=1.0",
+    "seaborn>=0.12",
+    
+    # Storage/IO
+    "h5py>=3.6",
+    
+    # GUI
+    "streamlit>=1.24",
+]
 
 [project.optional-dependencies]
-mcmc = ["emcee>=3.1", "corner>=2.2"]
-cli = ["click>=8.0", "rich>=12.0"]
-full = ["emcee>=3.1", "corner>=2.2", "batman-package>=2.4", "click>=8.0", "rich>=12.0", "h5py>=3.6"]
-dev = ["pytest>=7.0", "pytest-cov>=4.0", "black>=23.0", "isort>=5.12", "flake8>=6.0", "mypy>=1.0", "pre-commit>=3.0"]
-docs = ["sphinx>=6.0", "sphinx-rtd-theme>=1.2", "myst-parser>=1.0", "nbsphinx>=0.9", "ipykernel"]
+# MCMC fitting
+mcmc = [
+    "emcee>=3.1", 
+    "corner>=2.2",
+]
+
+# CLI interface
+cli = [
+    "click>=8.0", 
+    "rich>=12.0",
+]
+
+# ML transit detection (NEW v3.0)
+ml = [
+    "tensorflow>=2.10",
+    "transitleastsquares>=1.0.31",
+]
+
+# JWST spectroscopy & atmospheric retrieval (NEW v3.0)
+spectroscopy = [
+    "petitRADTRANS>=2.6",
+    "species>=0.5",
+]
+
+# Full installation - everything
+full = [
+    # Fitting
+    "emcee>=3.1", 
+    "corner>=2.2", 
+    "batman-package>=2.4",
+    # CLI
+    "click>=8.0", 
+    "rich>=12.0",
+    # ML detection (v3.0)
+    "tensorflow>=2.10",
+    "transitleastsquares>=1.0.31",
+    # Spectroscopy (v3.0)
+    "petitRADTRANS>=2.6",
+]
+
+# Development
+dev = [
+    "pytest>=7.0", 
+    "pytest-cov>=4.0", 
+    "black>=23.0", 
+    "isort>=5.12", 
+    "flake8>=6.0", 
+    "mypy>=1.0", 
+    "pre-commit>=3.0",
+]
+
+# Documentation
+docs = [
+    "sphinx>=6.0", 
+    "sphinx-rtd-theme>=1.2", 
+    "myst-parser>=1.0", 
+    "nbsphinx>=0.9", 
+    "ipykernel",
+]
 
 [project.scripts]
 transitkit = "transitkit.cli:main"
@@ -37,6 +127,8 @@ transitkit = "transitkit.cli:main"
 [project.urls]
 Homepage = "https://github.com/arifsolmaz/transitkit"
 Documentation = "https://transitkit.readthedocs.io"
+Issues = "https://github.com/arifsolmaz/transitkit/issues"
+Changelog = "https://github.com/arifsolmaz/transitkit/blob/main/CHANGELOG.md"
 
 [tool.setuptools.packages.find]
 where = ["src"]
@@ -50,10 +142,21 @@ transitkit = ["py.typed"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = ["-v", "--tb=short"]
-markers = ["slow: slow tests", "network: requires network"]
+markers = [
+    "slow: slow tests",
+    "network: requires network",
+    "jwst: requires JWST data download",
+]
 
 [tool.black]
 line-length = 100
 
 [tool.isort]
 profile = "black"
+line_length = 100
+
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
