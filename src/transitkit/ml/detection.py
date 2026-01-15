@@ -213,67 +213,39 @@ class MLTransitDetector:
             # Period grid
             periods = np.linspace(min_period, max_period, 10000)
             
-            # Run BLS
-            result = bls.power(periods, 0.01, 0.1)
+            # Run BLS with duration array
+            durations = np.linspace(0.01, 0.1, 10)
+            result = bls.power(periods, durations)
             
-            # Find peaks
             candidates = []
             
             # Get best period
             best_idx = np.argmax(result.power)
             best_period = result.period[best_idx]
             best_power = result.power[best_idx]
+            best_duration = result.duration[best_idx]
+            best_t0 = result.transit_time[best_idx]
             
-            # Get transit parameters
-            stats = bls.compute_stats(best_period, result.duration[best_idx], result.transit_time[best_idx])
+            # Get transit model for depth estimation
+            model = bls.model(time, best_period, best_duration, best_t0)
+            depth = 1.0 - np.min(model)
             
             # Estimate SNR
-            depth = stats['depth'][0]
-            snr = depth / np.nanstd(flux) * np.sqrt(stats['transit_count'])
+            in_transit = model < (1.0 - depth * 0.5)
+            n_transit_points = np.sum(in_transit)
+            noise = np.nanstd(flux)
+            snr = depth / noise * np.sqrt(max(n_transit_points, 1))
             
             candidate = TransitCandidate(
-                period=best_period,
-                t0=result.transit_time[best_idx],
-                duration=result.duration[best_idx] * 24,  # to hours
-                depth=depth * 1e6,  # to ppm
-                snr=snr,
-                bls_power=best_power
+                period=float(best_period),
+                t0=float(best_t0),
+                duration=float(best_duration) * 24,  # to hours
+                depth=float(depth) * 1e6,  # to ppm
+                snr=float(snr),
+                bls_power=float(best_power)
             )
             
             candidates.append(candidate)
-            
-            # Look for additional peaks
-            for i in range(2):
-                # Mask best period
-                mask = np.abs(result.period - best_period) > 0.01 * best_period
-                if not np.any(mask):
-                    break
-                
-                remaining_power = result.power.copy()
-                remaining_power[~mask] = 0
-                
-                next_idx = np.argmax(remaining_power)
-                if remaining_power[next_idx] > 0.5 * best_power:
-                    next_period = result.period[next_idx]
-                    next_stats = bls.compute_stats(
-                        next_period,
-                        result.duration[next_idx],
-                        result.transit_time[next_idx]
-                    )
-                    
-                    next_depth = next_stats['depth'][0]
-                    next_snr = next_depth / np.nanstd(flux) * np.sqrt(next_stats['transit_count'])
-                    
-                    candidates.append(TransitCandidate(
-                        period=next_period,
-                        t0=result.transit_time[next_idx],
-                        duration=result.duration[next_idx] * 24,
-                        depth=next_depth * 1e6,
-                        snr=next_snr,
-                        bls_power=remaining_power[next_idx]
-                    ))
-                    
-                    best_period = next_period
             
             return candidates
             
