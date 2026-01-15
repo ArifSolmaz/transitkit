@@ -66,6 +66,7 @@
 <li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_mcmc_corner"><code class="docutils literal notranslate"><span class="pre">plot_mcmc_corner()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_periodogram_comparison"><code class="docutils literal notranslate"><span class="pre">plot_periodogram_comparison()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_phase_folded"><code class="docutils literal notranslate"><span class="pre">plot_phase_folded()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_residuals"><code class="docutils literal notranslate"><span class="pre">plot_residuals()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_transit_duration_scan"><code class="docutils literal notranslate"><span class="pre">plot_transit_duration_scan()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_transit_summary"><code class="docutils literal notranslate"><span class="pre">plot_transit_summary()</span></code></a></li>
 <li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.setup_publication_style"><code class="docutils literal notranslate"><span class="pre">setup_publication_style()</span></code></a></li>
@@ -145,6 +146,30 @@
 <dt class="sig sig-object py" id="transitkit.visualization.plot_phase_folded">
 <span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_phase_folded</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">200</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'k'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'r'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_phase_folded"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_phase_folded" title="Link to this definition"></a></dt>
 <dd><p>Plot phase-folded light curve with binned data and model.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.plot_residuals">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_residuals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">residuals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'k'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_residuals"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_residuals" title="Link to this definition"></a></dt>
+<dd><p>Plot fit residuals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ax</strong> (<em>matplotlib.axes.Axes</em>) – Axes to plot on</p></li>
+<li><p><strong>time</strong> (<em>array</em>) – Time array</p></li>
+<li><p><strong>residuals</strong> (<em>array</em>) – Residual values (data - model)</p></li>
+<li><p><strong>color</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Point color</p></li>
+<li><p><strong>alpha</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Point transparency</p></li>
+<li><p><strong>ms</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Marker size</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ax</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.axes.Axes</p>
+</dd>
+</dl>
 </dd></dl>
 
 <dl class="py function">
