@@ -1,0 +1,242 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TransitKit Quick Start Guide &mdash; TransitKit 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+      <link rel="stylesheet" type="text/css" href="../_static/nbsphinx-code-cells.css?v=2aa19091" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+      <script>window.MathJax = {"tex": {"inlineMath": [["$", "$"], ["\\(", "\\)"]], "processEscapes": true}, "options": {"ignoreHtmlClass": "tex2jax_ignore|mathjax_ignore|document", "processHtmlClass": "tex2jax_process|mathjax_process|math|output_area"}}</script>
+      <script defer="defer" src="https://cdn.jsdelivr.net/npm/mathjax@4/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            TransitKit
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="ttv_analysis.html">Transit Timing Variations (TTV)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publication_plots.html">Publication-Quality Plots</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/analysis.html">Analysis Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/validation.html">Validation Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/io.html">I/O Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/visualization.html">Visualization Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">TransitKit</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">TransitKit Quick Start Guide</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/01_quick_start.ipynb.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="TransitKit-Quick-Start-Guide">
+<h1>TransitKit Quick Start Guide<a class="headerlink" href="#TransitKit-Quick-Start-Guide" title="Link to this heading"></a></h1>
+<p>This notebook demonstrates the basic workflow for transit detection.</p>
+<p><strong>Topics:</strong> Synthetic signals, noise, BLS detection, visualization</p>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>import numpy as np
+import matplotlib.pyplot as plt
+from transitkit.core import (
+    generate_transit_signal_mandel_agol,
+    find_transits_bls_advanced,
+    add_noise,
+    TransitParameters
+)
+print(&#39;TransitKit imported!&#39;)
+</pre></div>
+</div>
+</div>
+<section id="1.-Generate-Synthetic-Transit">
+<h2>1. Generate Synthetic Transit<a class="headerlink" href="#1.-Generate-Synthetic-Transit" title="Link to this heading"></a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># True parameters
+TRUE_PERIOD = 5.0
+TRUE_T0 = 2.5
+TRUE_DEPTH = 0.01  # 1%
+
+# Generate data
+time = np.linspace(0, 30, 2000)
+flux = generate_transit_signal_mandel_agol(time, period=TRUE_PERIOD, t0=TRUE_T0, depth=TRUE_DEPTH)
+flux_noisy = add_noise(flux, noise_level=0.001, seed=42)
+
+print(f&#39;Generated {len(time)} points, {int(30/TRUE_PERIOD)} transits&#39;)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># Plot light curve
+plt.figure(figsize=(12, 4))
+plt.plot(time, flux_noisy, &#39;k.&#39;, ms=1, alpha=0.5)
+plt.xlabel(&#39;Time (days)&#39;)
+plt.ylabel(&#39;Normalized Flux&#39;)
+plt.title(&#39;Synthetic Light Curve with Transits&#39;)
+plt.show()
+</pre></div>
+</div>
+</div>
+</section>
+<section id="2.-Detect-Transit-with-BLS">
+<h2>2. Detect Transit with BLS<a class="headerlink" href="#2.-Detect-Transit-with-BLS" title="Link to this heading"></a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span>result = find_transits_bls_advanced(time, flux_noisy, min_period=1.0, max_period=15.0)
+
+print(&#39;BLS Results:&#39;)
+print(f&quot;  Period: {result[&#39;period&#39;]:.4f} d (true: {TRUE_PERIOD})&quot;)
+print(f&quot;  Depth:  {result[&#39;depth&#39;]*1e6:.0f} ppm (true: {TRUE_DEPTH*1e6:.0f})&quot;)
+print(f&quot;  SNR:    {result[&#39;snr&#39;]:.1f}&quot;)
+</pre></div>
+</div>
+</div>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># Plot periodogram
+plt.figure(figsize=(10, 4))
+plt.plot(result[&#39;all_periods&#39;], result[&#39;all_powers&#39;], &#39;k-&#39;, lw=0.5)
+plt.axvline(result[&#39;period&#39;], color=&#39;r&#39;, ls=&#39;--&#39;, label=f&quot;Detected: {result[&#39;period&#39;]:.3f} d&quot;)
+plt.xlabel(&#39;Period (days)&#39;)
+plt.ylabel(&#39;BLS Power&#39;)
+plt.title(&#39;BLS Periodogram&#39;)
+plt.legend()
+plt.xscale(&#39;log&#39;)
+plt.show()
+</pre></div>
+</div>
+</div>
+</section>
+<section id="3.-Phase-Folded-Plot">
+<h2>3. Phase-Folded Plot<a class="headerlink" href="#3.-Phase-Folded-Plot" title="Link to this heading"></a></h2>
+<div class="nbinput nblast docutils container">
+<div class="prompt highlight-none notranslate"><div class="highlight"><pre><span></span>[ ]:
+</pre></div>
+</div>
+<div class="input_area highlight-none notranslate"><div class="highlight"><pre><span></span># Phase fold
+phase = ((time - result[&#39;t0&#39;]) / result[&#39;period&#39;]) % 1
+phase[phase &gt; 0.5] -= 1
+
+plt.figure(figsize=(8, 5))
+plt.plot(phase, flux_noisy, &#39;k.&#39;, ms=2, alpha=0.3)
+plt.xlabel(&#39;Phase&#39;)
+plt.ylabel(&#39;Flux&#39;)
+plt.title(f&quot;Phase-Folded (P={result[&#39;period&#39;]:.4f} d)&quot;)
+plt.xlim(-0.1, 0.1)
+plt.show()
+</pre></div>
+</div>
+</div>
+</section>
+<section id="Summary">
+<h2>Summary<a class="headerlink" href="#Summary" title="Link to this heading"></a></h2>
+<p>We successfully:</p>
+<ol class="arabic simple">
+<li><p>Generated synthetic transit</p></li>
+<li><p>Detected it with BLS</p></li>
+<li><p>Recovered correct period</p></li>
+</ol>
+<p><strong>Next:</strong> See other notebooks for TESS data, multi-method detection, and TTV analysis.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Arif Solmaz.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

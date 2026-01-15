@@ -1,0 +1,154 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Multi-Method Detection &mdash; TransitKit 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            TransitKit
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../installation.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="ttv_analysis.html">Transit Timing Variations (TTV)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="publication_plots.html">Publication-Quality Plots</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../api/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/analysis.html">Analysis Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/validation.html">Validation Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/io.html">I/O Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../api/visualization.html">Visualization Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../changelog.html">Changelog</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">TransitKit</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Multi-Method Detection</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/tutorials/multi_method.md.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="multi-method-detection">
+<h1>Multi-Method Detection<a class="headerlink" href="#multi-method-detection" title="Link to this heading"></a></h1>
+<p>Compare BLS, GLS, and PDM detection algorithms.</p>
+<section id="why-multiple-methods">
+<h2>Why Multiple Methods?<a class="headerlink" href="#why-multiple-methods" title="Link to this heading"></a></h2>
+<p>Different algorithms have different strengths:</p>
+<ul class="simple">
+<li><p><strong>BLS</strong>: Best for box-shaped transits</p></li>
+<li><p><strong>GLS</strong>: Good for sinusoidal variations</p></li>
+<li><p><strong>PDM</strong>: Robust for irregular signals</p></li>
+</ul>
+</section>
+<section id="running-multi-method-detection">
+<h2>Running Multi-Method Detection<a class="headerlink" href="#running-multi-method-detection" title="Link to this heading"></a></h2>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span><span class="w"> </span><span class="nn">transitkit.core</span><span class="w"> </span><span class="kn">import</span> <span class="n">find_transits_multiple_methods</span>
+
+<span class="n">results</span> <span class="o">=</span> <span class="n">find_transits_multiple_methods</span><span class="p">(</span>
+    <span class="n">time</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span>
+    <span class="n">min_period</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">max_period</span><span class="o">=</span><span class="mf">20.0</span><span class="p">,</span>
+    <span class="n">methods</span><span class="o">=</span><span class="p">[</span><span class="s1">&#39;bls&#39;</span><span class="p">,</span> <span class="s1">&#39;gls&#39;</span><span class="p">,</span> <span class="s1">&#39;pdm&#39;</span><span class="p">]</span>
+<span class="p">)</span>
+
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;BLS:       </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;bls&#39;</span><span class="p">][</span><span class="s1">&#39;period&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> d&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;GLS:       </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;gls&#39;</span><span class="p">][</span><span class="s1">&#39;period&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> d&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;PDM:       </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;pdm&#39;</span><span class="p">][</span><span class="s1">&#39;period&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> d&quot;</span><span class="p">)</span>
+<span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Consensus: </span><span class="si">{</span><span class="n">results</span><span class="p">[</span><span class="s1">&#39;consensus&#39;</span><span class="p">][</span><span class="s1">&#39;period&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2"> d&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</section>
+<section id="consensus-period">
+<h2>Consensus Period<a class="headerlink" href="#consensus-period" title="Link to this heading"></a></h2>
+<p>The consensus combines all methods with weighted averaging based on detection significance.</p>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Arif Solmaz.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
