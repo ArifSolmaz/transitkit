@@ -1,0 +1,493 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>transitkit.analysis &mdash; TransitKit 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            TransitKit
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/ttv_analysis.html">Transit Timing Variations (TTV)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/publication_plots.html">Publication-Quality Plots</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/analysis.html">Analysis Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/validation.html">Validation Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/io.html">I/O Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/visualization.html">Visualization Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">TransitKit</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">transitkit.analysis</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for transitkit.analysis</h1><div class="highlight"><pre>
+<span></span><span class="c1"># analysis.py - Advanced statistical analysis</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Advanced statistical analysis for transit light curves.</span>
+<span class="sd">Includes detrending, systematics removal, and significance testing.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">optimize</span><span class="p">,</span> <span class="n">signal</span><span class="p">,</span> <span class="n">stats</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.gaussian_process</span><span class="w"> </span><span class="kn">import</span> <span class="n">GaussianProcessRegressor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.gaussian_process.kernels</span><span class="w"> </span><span class="kn">import</span> <span class="n">RBF</span><span class="p">,</span> <span class="n">WhiteKernel</span>
+
+
+<div class="viewcode-block" id="detrend_light_curve_gp">
+<a class="viewcode-back" href="../../api/analysis.html#transitkit.analysis.detrend_light_curve_gp">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">detrend_light_curve_gp</span><span class="p">(</span>
+    <span class="n">time</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">flux_err</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">in_transit_mask</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">kernel</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">optimize_hyperparams</span><span class="o">=</span><span class="kc">True</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Detrend light curve using Gaussian Process regression.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    time : array</span>
+<span class="sd">        Time array</span>
+<span class="sd">    flux : array</span>
+<span class="sd">        Flux array</span>
+<span class="sd">    flux_err : array, optional</span>
+<span class="sd">        Flux errors</span>
+<span class="sd">    in_transit_mask : array, optional</span>
+<span class="sd">        Boolean mask of in-transit points to exclude from GP fit</span>
+<span class="sd">    kernel : sklearn.gaussian_process.kernels.Kernel</span>
+<span class="sd">        GP kernel</span>
+<span class="sd">    optimize_hyperparams : bool</span>
+<span class="sd">        Whether to optimize hyperparameters</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    detrended_flux : array</span>
+<span class="sd">        Detrended flux</span>
+<span class="sd">    trend : array</span>
+<span class="sd">        Fitted trend</span>
+<span class="sd">    gp : GaussianProcessRegressor</span>
+<span class="sd">        Fitted GP model</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">flux_err</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">flux_err</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">flux</span><span class="p">))</span>
+
+    <span class="k">if</span> <span class="n">in_transit_mask</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Fit to all data</span>
+        <span class="n">fit_mask</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">flux</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">bool</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Exclude in-transit points</span>
+        <span class="n">fit_mask</span> <span class="o">=</span> <span class="o">~</span><span class="n">in_transit_mask</span>
+
+    <span class="k">if</span> <span class="n">kernel</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Default kernel: RBF + White noise</span>
+        <span class="n">kernel</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">*</span> <span class="n">RBF</span><span class="p">(</span><span class="n">length_scale</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span> <span class="o">+</span> <span class="n">WhiteKernel</span><span class="p">(</span><span class="n">noise_level</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+
+    <span class="c1"># Create GP</span>
+    <span class="n">gp</span> <span class="o">=</span> <span class="n">GaussianProcessRegressor</span><span class="p">(</span>
+        <span class="n">kernel</span><span class="o">=</span><span class="n">kernel</span><span class="p">,</span>
+        <span class="n">alpha</span><span class="o">=</span><span class="n">flux_err</span><span class="p">[</span><span class="n">fit_mask</span><span class="p">]</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span>
+        <span class="n">normalize_y</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+        <span class="n">n_restarts_optimizer</span><span class="o">=</span><span class="mi">10</span> <span class="k">if</span> <span class="n">optimize_hyperparams</span> <span class="k">else</span> <span class="mi">0</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Reshape for sklearn</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">time</span><span class="p">[</span><span class="n">fit_mask</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">y</span> <span class="o">=</span> <span class="n">flux</span><span class="p">[</span><span class="n">fit_mask</span><span class="p">]</span>
+
+    <span class="c1"># Fit GP</span>
+    <span class="k">with</span> <span class="n">warnings</span><span class="o">.</span><span class="n">catch_warnings</span><span class="p">():</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">simplefilter</span><span class="p">(</span><span class="s2">&quot;ignore&quot;</span><span class="p">)</span>
+        <span class="n">gp</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">)</span>
+
+    <span class="c1"># Predict trend</span>
+    <span class="n">X_all</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">trend</span><span class="p">,</span> <span class="n">trend_std</span> <span class="o">=</span> <span class="n">gp</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_all</span><span class="p">,</span> <span class="n">return_std</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="c1"># Detrend</span>
+    <span class="n">detrended_flux</span> <span class="o">=</span> <span class="n">flux</span> <span class="o">-</span> <span class="n">trend</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">trend</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">detrended_flux</span><span class="p">,</span> <span class="n">trend</span><span class="p">,</span> <span class="n">gp</span></div>
+
+
+
+<div class="viewcode-block" id="remove_systematics_pca">
+<a class="viewcode-back" href="../../api/analysis.html#transitkit.analysis.remove_systematics_pca">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">remove_systematics_pca</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">n_components</span><span class="o">=</span><span class="mi">5</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Remove systematics using Principal Component Analysis.</span>
+<span class="sd">    Useful for TESS/Kepler data with common systematics.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.decomposition</span><span class="w"> </span><span class="kn">import</span> <span class="n">PCA</span>
+
+    <span class="c1"># Create design matrix (time derivatives, etc.)</span>
+    <span class="c1"># In practice, you&#39;d use co-trending basis vectors</span>
+    <span class="n">n_points</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">time</span><span class="p">)</span>
+
+    <span class="c1"># Simple polynomial basis</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">column_stack</span><span class="p">(</span>
+        <span class="p">[</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n_points</span><span class="p">),</span>
+            <span class="n">time</span><span class="p">,</span>
+            <span class="n">time</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+            <span class="n">time</span><span class="o">**</span><span class="mi">3</span><span class="p">,</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">time</span><span class="p">),</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">time</span><span class="p">),</span>
+        <span class="p">]</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Add more features based on known systematics</span>
+    <span class="c1"># ...</span>
+
+    <span class="c1"># PCA</span>
+    <span class="n">pca</span> <span class="o">=</span> <span class="n">PCA</span><span class="p">(</span><span class="n">n_components</span><span class="o">=</span><span class="n">n_components</span><span class="p">)</span>
+    <span class="n">components</span> <span class="o">=</span> <span class="n">pca</span><span class="o">.</span><span class="n">fit_transform</span><span class="p">(</span><span class="n">X</span><span class="p">)</span>
+
+    <span class="c1"># Regress out components</span>
+    <span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">lstsq</span><span class="p">(</span><span class="n">components</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">rcond</span><span class="o">=</span><span class="kc">None</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">systematics</span> <span class="o">=</span> <span class="n">components</span> <span class="o">@</span> <span class="n">coeffs</span>
+
+    <span class="n">corrected_flux</span> <span class="o">=</span> <span class="n">flux</span> <span class="o">-</span> <span class="n">systematics</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">systematics</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;corrected_flux&quot;</span><span class="p">:</span> <span class="n">corrected_flux</span><span class="p">,</span>
+        <span class="s2">&quot;systematics&quot;</span><span class="p">:</span> <span class="n">systematics</span><span class="p">,</span>
+        <span class="s2">&quot;components&quot;</span><span class="p">:</span> <span class="n">components</span><span class="p">,</span>
+        <span class="s2">&quot;explained_variance&quot;</span><span class="p">:</span> <span class="n">pca</span><span class="o">.</span><span class="n">explained_variance_ratio_</span><span class="p">,</span>
+        <span class="s2">&quot;pca&quot;</span><span class="p">:</span> <span class="n">pca</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="correct_for_airmass">
+<a class="viewcode-back" href="../../api/analysis.html#transitkit.analysis.correct_for_airmass">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">correct_for_airmass</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">airmass</span><span class="p">,</span> <span class="n">flux_err</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Correct for airmass effects (ground-based observations).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Model airmass effect as exponential</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">airmass_model</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">am</span><span class="p">):</span>
+        <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="n">params</span>
+        <span class="k">return</span> <span class="n">a</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="n">b</span> <span class="o">*</span> <span class="p">(</span><span class="n">am</span> <span class="o">-</span> <span class="mi">1</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">residuals</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">am</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">f</span> <span class="o">-</span> <span class="n">airmass_model</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">am</span><span class="p">)</span>
+
+    <span class="c1"># Fit airmass correction</span>
+    <span class="n">params0</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">]</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">optimize</span><span class="o">.</span><span class="n">least_squares</span><span class="p">(</span><span class="n">residuals</span><span class="p">,</span> <span class="n">params0</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">airmass</span><span class="p">,</span> <span class="n">flux</span><span class="p">))</span>
+
+    <span class="n">correction</span> <span class="o">=</span> <span class="n">airmass_model</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">x</span><span class="p">,</span> <span class="n">airmass</span><span class="p">)</span>
+    <span class="n">corrected_flux</span> <span class="o">=</span> <span class="n">flux</span> <span class="o">/</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">correction</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;corrected_flux&quot;</span><span class="p">:</span> <span class="n">corrected_flux</span><span class="p">,</span>
+        <span class="s2">&quot;correction&quot;</span><span class="p">:</span> <span class="n">correction</span><span class="p">,</span>
+        <span class="s2">&quot;params&quot;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">x</span><span class="p">,</span>
+        <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">success</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="measure_transit_timing_variations">
+<a class="viewcode-back" href="../../api/analysis.html#transitkit.analysis.measure_transit_timing_variations">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">measure_transit_timing_variations</span><span class="p">(</span>
+    <span class="n">time</span><span class="p">,</span>
+    <span class="n">flux</span><span class="p">,</span>
+    <span class="n">period</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">t0</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">duration</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span>
+    <span class="n">window_factor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.5</span><span class="p">,</span>
+    <span class="n">min_points</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">8</span><span class="p">,</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Lightweight TTV estimator.</span>
+<span class="sd">    Always returns keys required by tests: ttvs_detected, p_value, ttvs, epochs, rms_ttv.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+
+    <span class="n">t</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="n">f</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">flux</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">t</span><span class="o">.</span><span class="n">size</span> <span class="o">!=</span> <span class="n">f</span><span class="o">.</span><span class="n">size</span> <span class="ow">or</span> <span class="n">t</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;ttvs_detected&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s2">&quot;p_value&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+            <span class="s2">&quot;ttvs&quot;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">&quot;epochs&quot;</span><span class="p">:</span> <span class="p">[],</span>
+            <span class="s2">&quot;rms_ttv&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;ttv_period&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;ttv_amplitude&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">),</span>
+        <span class="p">}</span>
+
+    <span class="c1"># epochs that cover the dataset</span>
+    <span class="n">e_min</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">((</span><span class="n">t</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">period</span><span class="p">))</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">e_max</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">ceil</span><span class="p">((</span><span class="n">t</span><span class="o">.</span><span class="n">max</span><span class="p">()</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">period</span><span class="p">))</span> <span class="o">+</span> <span class="mi">1</span>
+    <span class="n">epochs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">e_min</span><span class="p">,</span> <span class="n">e_max</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">used_epochs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">ttvs</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">e</span> <span class="ow">in</span> <span class="n">epochs</span><span class="p">:</span>
+        <span class="n">tc</span> <span class="o">=</span> <span class="n">t0</span> <span class="o">+</span> <span class="n">e</span> <span class="o">*</span> <span class="n">period</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">t</span> <span class="o">-</span> <span class="n">tc</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">window_factor</span> <span class="o">*</span> <span class="n">duration</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">min_points</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">tw</span> <span class="o">=</span> <span class="n">t</span><span class="p">[</span><span class="n">m</span><span class="p">]</span>
+        <span class="n">fw</span> <span class="o">=</span> <span class="n">f</span><span class="p">[</span><span class="n">m</span><span class="p">]</span>
+
+        <span class="c1"># initial mid-time = min flux</span>
+        <span class="n">i0</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nanargmin</span><span class="p">(</span><span class="n">fw</span><span class="p">))</span>
+        <span class="n">t_guess</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">tw</span><span class="p">[</span><span class="n">i0</span><span class="p">])</span>
+
+        <span class="c1"># refine with a quadratic fit around nearest points</span>
+        <span class="n">order</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">tw</span> <span class="o">-</span> <span class="n">t_guess</span><span class="p">))</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="nb">min</span><span class="p">(</span><span class="mi">7</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">order</span><span class="p">)))</span>
+        <span class="k">if</span> <span class="n">k</span> <span class="o">&gt;=</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="n">tt</span> <span class="o">=</span> <span class="n">tw</span><span class="p">[</span><span class="n">order</span><span class="p">[:</span><span class="n">k</span><span class="p">]]</span>
+            <span class="n">yy</span> <span class="o">=</span> <span class="n">fw</span><span class="p">[</span><span class="n">order</span><span class="p">[:</span><span class="n">k</span><span class="p">]]</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">,</span> <span class="n">c</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">tt</span><span class="p">,</span> <span class="n">yy</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">a</span> <span class="o">!=</span> <span class="mi">0</span><span class="p">:</span>
+                    <span class="n">t_best</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="o">-</span><span class="n">b</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">a</span><span class="p">))</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">t_best</span> <span class="o">=</span> <span class="n">t_guess</span>
+            <span class="k">except</span> <span class="ne">Exception</span><span class="p">:</span>
+                <span class="n">t_best</span> <span class="o">=</span> <span class="n">t_guess</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">t_best</span> <span class="o">=</span> <span class="n">t_guess</span>
+
+        <span class="n">used_epochs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">e</span><span class="p">))</span>
+        <span class="n">ttvs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">t_best</span> <span class="o">-</span> <span class="n">tc</span><span class="p">)</span>
+
+    <span class="n">ttvs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">ttvs</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">ttvs</span><span class="o">.</span><span class="n">size</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;ttvs_detected&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+            <span class="s2">&quot;p_value&quot;</span><span class="p">:</span> <span class="mf">1.0</span><span class="p">,</span>
+            <span class="s2">&quot;ttvs&quot;</span><span class="p">:</span> <span class="n">ttvs</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+            <span class="s2">&quot;epochs&quot;</span><span class="p">:</span> <span class="n">used_epochs</span><span class="p">,</span>
+            <span class="s2">&quot;rms_ttv&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">ttvs</span><span class="o">**</span><span class="mi">2</span><span class="p">)))</span> <span class="k">if</span> <span class="n">ttvs</span><span class="o">.</span><span class="n">size</span> <span class="k">else</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;ttv_period&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">),</span>
+            <span class="s2">&quot;ttv_amplitude&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">),</span>
+        <span class="p">}</span>
+
+    <span class="c1"># simple significance: is mean TTV != 0 ?</span>
+    <span class="n">tstat</span><span class="p">,</span> <span class="n">p_value</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">ttest_1samp</span><span class="p">(</span><span class="n">ttvs</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">nan_policy</span><span class="o">=</span><span class="s2">&quot;omit&quot;</span><span class="p">)</span>
+    <span class="n">p_value</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">p_value</span><span class="p">)</span> <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">p_value</span><span class="p">)</span> <span class="k">else</span> <span class="mf">1.0</span>
+
+    <span class="n">rms_ttv</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">ttvs</span><span class="o">**</span><span class="mi">2</span><span class="p">)))</span>
+    <span class="n">ttv_amp</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nanpercentile</span><span class="p">(</span><span class="n">ttvs</span><span class="p">,</span> <span class="mi">84</span><span class="p">)</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">nanpercentile</span><span class="p">(</span><span class="n">ttvs</span><span class="p">,</span> <span class="mi">16</span><span class="p">)))</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;ttvs_detected&quot;</span><span class="p">:</span> <span class="nb">bool</span><span class="p">(</span><span class="n">p_value</span> <span class="o">&lt;</span> <span class="mf">0.01</span><span class="p">),</span>
+        <span class="s2">&quot;p_value&quot;</span><span class="p">:</span> <span class="n">p_value</span><span class="p">,</span>
+        <span class="s2">&quot;ttvs&quot;</span><span class="p">:</span> <span class="n">ttvs</span><span class="o">.</span><span class="n">tolist</span><span class="p">(),</span>
+        <span class="s2">&quot;epochs&quot;</span><span class="p">:</span> <span class="n">used_epochs</span><span class="p">,</span>
+        <span class="s2">&quot;rms_ttv&quot;</span><span class="p">:</span> <span class="n">rms_ttv</span><span class="p">,</span>
+        <span class="s2">&quot;ttv_period&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;nan&quot;</span><span class="p">),</span>
+        <span class="s2">&quot;ttv_amplitude&quot;</span><span class="p">:</span> <span class="n">ttv_amp</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="fit_transit_time">
+<a class="viewcode-back" href="../../api/analysis.html#transitkit.analysis.fit_transit_time">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit_transit_time</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">t0_guess</span><span class="p">,</span> <span class="n">duration</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fit precise transit time for a single epoch.&quot;&quot;&quot;</span>
+
+    <span class="c1"># Define transit model</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">transit_model</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+        <span class="n">t0</span><span class="p">,</span> <span class="n">depth</span> <span class="o">=</span> <span class="n">params</span>
+        <span class="n">phase</span> <span class="o">=</span> <span class="p">((</span><span class="n">t</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">period</span><span class="p">)</span> <span class="o">%</span> <span class="mi">1</span>
+        <span class="n">half_width</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">duration</span> <span class="o">/</span> <span class="n">period</span>
+
+        <span class="n">model</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones_like</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="n">in_transit</span> <span class="o">=</span> <span class="p">(</span><span class="n">phase</span> <span class="o">&lt;</span> <span class="n">half_width</span><span class="p">)</span> <span class="o">|</span> <span class="p">(</span><span class="n">phase</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">half_width</span><span class="p">)</span>
+        <span class="n">model</span><span class="p">[</span><span class="n">in_transit</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">depth</span>
+
+        <span class="k">return</span> <span class="n">model</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">residuals</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">f</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">f</span> <span class="o">-</span> <span class="n">transit_model</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+
+    <span class="c1"># Initial guess</span>
+    <span class="n">params0</span> <span class="o">=</span> <span class="p">[</span><span class="n">t0_guess</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">]</span>
+
+    <span class="c1"># Fit</span>
+    <span class="n">result</span> <span class="o">=</span> <span class="n">optimize</span><span class="o">.</span><span class="n">least_squares</span><span class="p">(</span><span class="n">residuals</span><span class="p">,</span> <span class="n">params0</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">flux</span><span class="p">))</span>
+
+    <span class="c1"># Estimate errors from covariance matrix</span>
+    <span class="n">jac</span> <span class="o">=</span> <span class="n">result</span><span class="o">.</span><span class="n">jac</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">cov</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">jac</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">jac</span><span class="p">)</span>
+        <span class="n">errors</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">cov</span><span class="p">))</span>
+        <span class="n">t0_err</span> <span class="o">=</span> <span class="n">errors</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="k">except</span><span class="p">:</span>
+        <span class="n">t0_err</span> <span class="o">=</span> <span class="n">duration</span> <span class="o">/</span> <span class="mi">10</span>  <span class="c1"># Rough estimate</span>
+
+    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">t0_err</span></div>
+
+
+
+<div class="viewcode-block" id="fit_sinusoidal_ttv">
+<a class="viewcode-back" href="../../api/analysis.html#transitkit.analysis.fit_sinusoidal_ttv">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">fit_sinusoidal_ttv</span><span class="p">(</span><span class="n">epochs</span><span class="p">,</span> <span class="n">ttvs</span><span class="p">,</span> <span class="n">ttv_errs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fit sinusoidal TTV pattern.&quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">sinusoid</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">t</span><span class="p">):</span>
+        <span class="n">A</span><span class="p">,</span> <span class="n">P</span><span class="p">,</span> <span class="n">phi</span><span class="p">,</span> <span class="n">offset</span> <span class="o">=</span> <span class="n">params</span>
+        <span class="k">return</span> <span class="n">A</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">*</span> <span class="n">t</span> <span class="o">/</span> <span class="n">P</span> <span class="o">+</span> <span class="n">phi</span><span class="p">)</span> <span class="o">+</span> <span class="n">offset</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">residuals</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">yerr</span><span class="p">):</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">y</span> <span class="o">-</span> <span class="n">sinusoid</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">t</span><span class="p">))</span> <span class="o">/</span> <span class="n">yerr</span>
+
+    <span class="c1"># Initial guesses</span>
+    <span class="n">A_guess</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">ttvs</span><span class="p">)</span>
+    <span class="n">P_guess</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">ttvs</span><span class="p">)</span> <span class="o">/</span> <span class="mi">2</span>  <span class="c1"># Rough guess</span>
+    <span class="n">params0</span> <span class="o">=</span> <span class="p">[</span><span class="n">A_guess</span><span class="p">,</span> <span class="n">P_guess</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">ttvs</span><span class="p">)]</span>
+
+    <span class="c1"># Fit</span>
+    <span class="n">bounds</span> <span class="o">=</span> <span class="p">([</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="o">-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">],</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">ttvs</span><span class="p">)</span> <span class="o">*</span> <span class="mi">2</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">])</span>
+
+    <span class="n">result</span> <span class="o">=</span> <span class="n">optimize</span><span class="o">.</span><span class="n">least_squares</span><span class="p">(</span>
+        <span class="n">residuals</span><span class="p">,</span> <span class="n">params0</span><span class="p">,</span> <span class="n">args</span><span class="o">=</span><span class="p">(</span><span class="n">epochs</span><span class="p">,</span> <span class="n">ttvs</span><span class="p">,</span> <span class="n">ttv_errs</span><span class="p">),</span> <span class="n">bounds</span><span class="o">=</span><span class="n">bounds</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">result</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">result</span><span class="o">.</span><span class="n">x</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Period, Amplitude</span></div>
+
+
+
+<div class="viewcode-block" id="calculate_transit_duration_ratio">
+<a class="viewcode-back" href="../../api/analysis.html#transitkit.analysis.calculate_transit_duration_ratio">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calculate_transit_duration_ratio</span><span class="p">(</span>
+    <span class="n">primary_duration</span><span class="p">,</span> <span class="n">secondary_duration</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">period</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">eccentricity</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">omega</span><span class="o">=</span><span class="mi">90</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate transit duration ratio for eccentricity constraints.</span>
+
+<span class="sd">    For eccentric orbits, duration varies with true anomaly.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">secondary_duration</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Need other parameters</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">ratio</span> <span class="o">=</span> <span class="n">primary_duration</span> <span class="o">/</span> <span class="n">secondary_duration</span>
+
+    <span class="c1"># Expected ratio for circular orbit</span>
+    <span class="n">expected_circular</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+    <span class="c1"># Correction for eccentricity</span>
+    <span class="k">if</span> <span class="n">eccentricity</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="n">period</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># Simplified correction (Winn 2010)</span>
+        <span class="n">omega_rad</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">radians</span><span class="p">(</span><span class="n">omega</span><span class="p">)</span>
+        <span class="n">factor</span> <span class="o">=</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="n">eccentricity</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">omega_rad</span><span class="p">))</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">eccentricity</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="n">expected_eccentric</span> <span class="o">=</span> <span class="n">factor</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">expected_eccentric</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;measured_ratio&quot;</span><span class="p">:</span> <span class="n">ratio</span><span class="p">,</span>
+        <span class="s2">&quot;expected_circular&quot;</span><span class="p">:</span> <span class="n">expected_circular</span><span class="p">,</span>
+        <span class="s2">&quot;expected_eccentric&quot;</span><span class="p">:</span> <span class="n">expected_eccentric</span><span class="p">,</span>
+        <span class="s2">&quot;eccentricity_suggested&quot;</span><span class="p">:</span> <span class="nb">abs</span><span class="p">(</span><span class="n">ratio</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">0.1</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Arif Solmaz.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -56,7 +56,15 @@
 <ul class="current">
 <li class="toctree-l1"><a class="reference internal" href="core.html">Core Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="analysis.html">Analysis Module</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Validation Module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Validation Module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.validation.assess_multiple_event_statistic"><code class="docutils literal notranslate"><span class="pre">assess_multiple_event_statistic()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.validation.calculate_detection_significance"><code class="docutils literal notranslate"><span class="pre">calculate_detection_significance()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.validation.compare_with_known_ephemeris"><code class="docutils literal notranslate"><span class="pre">compare_with_known_ephemeris()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.validation.perform_injection_recovery_test"><code class="docutils literal notranslate"><span class="pre">perform_injection_recovery_test()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.validation.validate_against_secondary_eclipse"><code class="docutils literal notranslate"><span class="pre">validate_against_secondary_eclipse()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.validation.validate_transit_parameters"><code class="docutils literal notranslate"><span class="pre">validate_transit_parameters()</span></code></a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="io.html">I/O Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="visualization.html">Visualization Module</a></li>
 </ul>
@@ -92,6 +100,45 @@
   <section id="validation-module">
 <h1>Validation Module<a class="headerlink" href="#validation-module" title="Link to this heading"></a></h1>
 <p>Transit validation and quality checks.</p>
+<p id="module-transitkit.validation">Validation tools for transit analysis results.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.validation.assess_multiple_event_statistic">
+<span class="sig-prename descclassname"><span class="pre">transitkit.validation.</span></span><span class="sig-name descname"><span class="pre">assess_multiple_event_statistic</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">period</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/validation.html#assess_multiple_event_statistic"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.validation.assess_multiple_event_statistic" title="Link to this definition"></a></dt>
+<dd><p>Calculate Multiple Event Statistic (MES) for transit detection.
+Similar to Kepler pipeline.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.validation.calculate_detection_significance">
+<span class="sig-prename descclassname"><span class="pre">transitkit.validation.</span></span><span class="sig-name descname"><span class="pre">calculate_detection_significance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">bls_result</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_shuffles</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/validation.html#calculate_detection_significance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.validation.calculate_detection_significance" title="Link to this definition"></a></dt>
+<dd><p>Calculate detection significance via data shuffling.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.validation.compare_with_known_ephemeris">
+<span class="sig-prename descclassname"><span class="pre">transitkit.validation.</span></span><span class="sig-name descname"><span class="pre">compare_with_known_ephemeris</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">known_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tolerance</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.01</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/validation.html#compare_with_known_ephemeris"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.validation.compare_with_known_ephemeris" title="Link to this definition"></a></dt>
+<dd><p>Compare detected parameters with known ephemeris.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.validation.perform_injection_recovery_test">
+<span class="sig-prename descclassname"><span class="pre">transitkit.validation.</span></span><span class="sig-name descname"><span class="pre">perform_injection_recovery_test</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">injection_params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_trials</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">noise_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.001</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">42</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/validation.html#perform_injection_recovery_test"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.validation.perform_injection_recovery_test" title="Link to this definition"></a></dt>
+<dd><p>Perform injection-recovery test to assess detection efficiency.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.validation.validate_against_secondary_eclipse">
+<span class="sig-prename descclassname"><span class="pre">transitkit.validation.</span></span><span class="sig-name descname"><span class="pre">validate_against_secondary_eclipse</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">period</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">duration</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/validation.html#validate_against_secondary_eclipse"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.validation.validate_against_secondary_eclipse" title="Link to this definition"></a></dt>
+<dd><p>Check for secondary eclipse to validate planet detection.
+Secondary eclipse at phase 0.5 if eccentric.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.validation.validate_transit_parameters">
+<span class="sig-prename descclassname"><span class="pre">transitkit.validation.</span></span><span class="sig-name descname"><span class="pre">validate_transit_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/validation.html#validate_transit_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.validation.validate_transit_parameters" title="Link to this definition"></a></dt>
+<dd><p>Validate transit parameters against physical limits.</p>
+</dd></dl>
+
 </section>
 
 

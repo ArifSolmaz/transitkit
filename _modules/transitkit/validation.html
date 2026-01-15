@@ -1,0 +1,463 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="../../">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>transitkit.validation &mdash; TransitKit 2.0.0 documentation</title>
+      <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=b86133f3" />
+      <link rel="stylesheet" type="text/css" href="../../_static/css/theme.css?v=9edc463e" />
+
+  
+      <script src="../../_static/jquery.js?v=5d32c60e"></script>
+      <script src="../../_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="../../_static/documentation_options.js?v=51b770b3"></script>
+      <script src="../../_static/doctools.js?v=fd6eb6e6"></script>
+      <script src="../../_static/sphinx_highlight.js?v=6ffebe34"></script>
+      <script crossorigin="anonymous" integrity="sha256-Ae2Vz/4ePdIu6ZyI/5ZGsYnb+m0JlOmKPjt6XZ9JJkA=" src="https://cdnjs.cloudflare.com/ajax/libs/require.js/2.3.4/require.min.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="../../index.html" class="icon icon-home">
+            TransitKit
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption" role="heading"><span class="caption-text">Getting Started</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../installation.html">Installation</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">User Guide</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/ttv_analysis.html">Transit Timing Variations (TTV)</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../tutorials/publication_plots.html">Publication-Quality Plots</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">API Reference</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api/core.html">Core Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/analysis.html">Analysis Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/validation.html">Validation Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/io.html">I/O Module</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api/visualization.html">Visualization Module</a></li>
+</ul>
+<p class="caption" role="heading"><span class="caption-text">Development</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../changelog.html">Changelog</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">TransitKit</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home" aria-label="Home"></a></li>
+          <li class="breadcrumb-item"><a href="../index.html">Module code</a></li>
+      <li class="breadcrumb-item active">transitkit.validation</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for transitkit.validation</h1><div class="highlight"><pre>
+<span></span><span class="c1"># validation.py - Validation and testing</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Validation tools for transit analysis results.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
+
+<span class="c1"># Import core functions needed for validation tests</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">.core</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>
+    <span class="n">add_noise</span><span class="p">,</span>
+    <span class="n">find_transits_bls_advanced</span><span class="p">,</span>
+    <span class="n">generate_transit_signal_mandel_agol</span><span class="p">,</span>
+<span class="p">)</span>
+
+
+<div class="viewcode-block" id="validate_transit_parameters">
+<a class="viewcode-back" href="../../api/validation.html#transitkit.validation.validate_transit_parameters">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_transit_parameters</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">flux</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validate transit parameters against physical limits.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">validation</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># Check period</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;period_positive&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">period</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;period_realistic&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1</span> <span class="o">&lt;</span> <span class="n">params</span><span class="o">.</span><span class="n">period</span> <span class="o">&lt;</span> <span class="mi">1000</span>
+
+    <span class="c1"># Check duration</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;duration_positive&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">duration</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;duration_lt_period&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">duration</span> <span class="o">&lt;</span> <span class="n">params</span><span class="o">.</span><span class="n">period</span>
+
+    <span class="c1"># Typical transit durations: 1-15 hours</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;duration_realistic&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">/</span> <span class="mi">24</span> <span class="o">&lt;</span> <span class="n">params</span><span class="o">.</span><span class="n">duration</span> <span class="o">&lt;</span> <span class="mi">15</span> <span class="o">/</span> <span class="mi">24</span>
+
+    <span class="c1"># Check depth</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;depth_positive&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">depth</span> <span class="o">&gt;</span> <span class="mi">0</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;depth_lt_one&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">depth</span> <span class="o">&lt;</span> <span class="mi">1</span>
+
+    <span class="c1"># Typical depths: up to 3% (hot Jupiters)</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;depth_realistic&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">depth</span> <span class="o">&lt;</span> <span class="mf">0.03</span>
+
+    <span class="c1"># Check t0 within data range</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;t0_in_range&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">&lt;=</span> <span class="n">params</span><span class="o">.</span><span class="n">t0</span> <span class="o">&lt;=</span> <span class="n">time</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
+
+    <span class="c1"># Calculate additional checks</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;snr_valid&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">params</span><span class="o">.</span><span class="n">snr</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="s2">&quot;snr&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="kc">True</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;fap_valid&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span> <span class="o">&lt;=</span> <span class="n">params</span><span class="o">.</span><span class="n">fap</span> <span class="o">&lt;=</span> <span class="mi">1</span> <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="s2">&quot;fap&quot;</span><span class="p">)</span> <span class="k">else</span> <span class="kc">True</span>
+
+    <span class="c1"># Overall validation</span>
+    <span class="n">validation</span><span class="p">[</span><span class="s2">&quot;all_passed&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span>
+        <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">validation</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="ow">not</span> <span class="n">k</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">validation</span></div>
+
+
+
+<div class="viewcode-block" id="compare_with_known_ephemeris">
+<a class="viewcode-back" href="../../api/validation.html#transitkit.validation.compare_with_known_ephemeris">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">compare_with_known_ephemeris</span><span class="p">(</span><span class="n">params</span><span class="p">,</span> <span class="n">known_params</span><span class="p">,</span> <span class="n">tolerance</span><span class="o">=</span><span class="mf">0.01</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Compare detected parameters with known ephemeris.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">comparison</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="c1"># Period comparison</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">known_params</span><span class="p">,</span> <span class="s2">&quot;period&quot;</span><span class="p">):</span>
+        <span class="n">period_diff</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">period</span> <span class="o">-</span> <span class="n">known_params</span><span class="o">.</span><span class="n">period</span><span class="p">)</span> <span class="o">/</span> <span class="n">known_params</span><span class="o">.</span><span class="n">period</span>
+        <span class="n">comparison</span><span class="p">[</span><span class="s2">&quot;period_match&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">period_diff</span> <span class="o">&lt;</span> <span class="n">tolerance</span>
+        <span class="n">comparison</span><span class="p">[</span><span class="s2">&quot;period_diff&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">period_diff</span>
+
+    <span class="c1"># T0 comparison (modulo period)</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">known_params</span><span class="p">,</span> <span class="s2">&quot;t0&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">known_params</span><span class="p">,</span> <span class="s2">&quot;period&quot;</span><span class="p">):</span>
+        <span class="c1"># Adjust t0 to same epoch</span>
+        <span class="n">epoch_diff</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">round</span><span class="p">((</span><span class="n">params</span><span class="o">.</span><span class="n">t0</span> <span class="o">-</span> <span class="n">known_params</span><span class="o">.</span><span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">known_params</span><span class="o">.</span><span class="n">period</span><span class="p">)</span>
+        <span class="n">t0_aligned</span> <span class="o">=</span> <span class="n">known_params</span><span class="o">.</span><span class="n">t0</span> <span class="o">+</span> <span class="n">epoch_diff</span> <span class="o">*</span> <span class="n">known_params</span><span class="o">.</span><span class="n">period</span>
+        <span class="n">t0_diff</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">t0</span> <span class="o">-</span> <span class="n">t0_aligned</span><span class="p">)</span>
+        <span class="n">comparison</span><span class="p">[</span><span class="s2">&quot;t0_match&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">t0_diff</span> <span class="o">&lt;</span> <span class="n">tolerance</span> <span class="o">*</span> <span class="n">known_params</span><span class="o">.</span><span class="n">period</span>
+        <span class="n">comparison</span><span class="p">[</span><span class="s2">&quot;t0_diff&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">t0_diff</span>
+
+    <span class="c1"># Depth comparison</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">known_params</span><span class="p">,</span> <span class="s2">&quot;depth&quot;</span><span class="p">):</span>
+        <span class="n">depth_diff</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">depth</span> <span class="o">-</span> <span class="n">known_params</span><span class="o">.</span><span class="n">depth</span><span class="p">)</span> <span class="o">/</span> <span class="n">known_params</span><span class="o">.</span><span class="n">depth</span>
+        <span class="n">comparison</span><span class="p">[</span><span class="s2">&quot;depth_match&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">depth_diff</span> <span class="o">&lt;</span> <span class="n">tolerance</span>
+        <span class="n">comparison</span><span class="p">[</span><span class="s2">&quot;depth_diff&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">depth_diff</span>
+
+    <span class="c1"># Duration comparison</span>
+    <span class="k">if</span> <span class="nb">hasattr</span><span class="p">(</span><span class="n">known_params</span><span class="p">,</span> <span class="s2">&quot;duration&quot;</span><span class="p">):</span>
+        <span class="n">dur_diff</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">duration</span> <span class="o">-</span> <span class="n">known_params</span><span class="o">.</span><span class="n">duration</span><span class="p">)</span> <span class="o">/</span> <span class="n">known_params</span><span class="o">.</span><span class="n">duration</span>
+        <span class="n">comparison</span><span class="p">[</span><span class="s2">&quot;duration_match&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dur_diff</span> <span class="o">&lt;</span> <span class="n">tolerance</span>
+        <span class="n">comparison</span><span class="p">[</span><span class="s2">&quot;duration_diff&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">dur_diff</span>
+
+    <span class="c1"># Overall match</span>
+    <span class="n">comparison</span><span class="p">[</span><span class="s2">&quot;overall_match&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="nb">all</span><span class="p">(</span>
+        <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">comparison</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;_match&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="nb">bool</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">comparison</span></div>
+
+
+
+<div class="viewcode-block" id="perform_injection_recovery_test">
+<a class="viewcode-back" href="../../api/validation.html#transitkit.validation.perform_injection_recovery_test">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">perform_injection_recovery_test</span><span class="p">(</span>
+    <span class="n">time</span><span class="p">,</span> <span class="n">injection_params</span><span class="p">,</span> <span class="n">n_trials</span><span class="o">=</span><span class="mi">100</span><span class="p">,</span> <span class="n">noise_level</span><span class="o">=</span><span class="mf">0.001</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="mi">42</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Perform injection-recovery test to assess detection efficiency.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+
+    <span class="n">recoveries</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">recovered_params</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_trials</span><span class="p">):</span>
+        <span class="c1"># Generate synthetic light curve</span>
+        <span class="n">clean_signal</span> <span class="o">=</span> <span class="n">generate_transit_signal_mandel_agol</span><span class="p">(</span>
+            <span class="n">time</span><span class="p">,</span>
+            <span class="n">injection_params</span><span class="o">.</span><span class="n">period</span><span class="p">,</span>
+            <span class="n">injection_params</span><span class="o">.</span><span class="n">t0</span><span class="p">,</span>
+            <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">injection_params</span><span class="o">.</span><span class="n">depth</span><span class="p">),</span>  <span class="c1"># rprs</span>
+            <span class="mf">10.0</span><span class="p">,</span>  <span class="c1"># aRs (placeholder)</span>
+            <span class="n">u1</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>
+            <span class="n">u2</span><span class="o">=</span><span class="mf">0.3</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Add noise</span>
+        <span class="n">noisy_flux</span> <span class="o">=</span> <span class="n">add_noise</span><span class="p">(</span><span class="n">clean_signal</span><span class="p">,</span> <span class="n">noise_level</span><span class="o">=</span><span class="n">noise_level</span><span class="p">)</span>
+
+        <span class="c1"># Try to recover</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="n">find_transits_bls_advanced</span><span class="p">(</span>
+                <span class="n">time</span><span class="p">,</span>
+                <span class="n">noisy_flux</span><span class="p">,</span>
+                <span class="n">min_period</span><span class="o">=</span><span class="n">injection_params</span><span class="o">.</span><span class="n">period</span> <span class="o">*</span> <span class="mf">0.9</span><span class="p">,</span>
+                <span class="n">max_period</span><span class="o">=</span><span class="n">injection_params</span><span class="o">.</span><span class="n">period</span> <span class="o">*</span> <span class="mf">1.1</span><span class="p">,</span>
+            <span class="p">)</span>
+
+            <span class="n">recovered</span> <span class="o">=</span> <span class="n">result</span><span class="p">[</span><span class="s2">&quot;period&quot;</span><span class="p">]</span>
+            <span class="n">recovery_success</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="nb">abs</span><span class="p">(</span><span class="n">recovered</span> <span class="o">-</span> <span class="n">injection_params</span><span class="o">.</span><span class="n">period</span><span class="p">)</span> <span class="o">/</span> <span class="n">injection_params</span><span class="o">.</span><span class="n">period</span> <span class="o">&lt;</span> <span class="mf">0.01</span>
+            <span class="p">)</span>
+
+            <span class="n">recoveries</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">recovery_success</span><span class="p">)</span>
+            <span class="n">recovered_params</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
+                <span class="p">{</span><span class="s2">&quot;period&quot;</span><span class="p">:</span> <span class="n">recovered</span><span class="p">,</span> <span class="s2">&quot;snr&quot;</span><span class="p">:</span> <span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;snr&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="n">recovery_success</span><span class="p">}</span>
+            <span class="p">)</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="n">recoveries</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="kc">False</span><span class="p">)</span>
+            <span class="n">recovered_params</span><span class="o">.</span><span class="n">append</span><span class="p">({</span><span class="s2">&quot;success&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">})</span>
+
+    <span class="n">recovery_rate</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">recoveries</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;recovery_rate&quot;</span><span class="p">:</span> <span class="n">recovery_rate</span><span class="p">,</span>
+        <span class="s2">&quot;n_trials&quot;</span><span class="p">:</span> <span class="n">n_trials</span><span class="p">,</span>
+        <span class="s2">&quot;n_recovered&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">recoveries</span><span class="p">),</span>
+        <span class="s2">&quot;injection_params&quot;</span><span class="p">:</span> <span class="n">injection_params</span><span class="p">,</span>
+        <span class="s2">&quot;recovered_params&quot;</span><span class="p">:</span> <span class="n">recovered_params</span><span class="p">,</span>
+        <span class="s2">&quot;detection_efficiency&quot;</span><span class="p">:</span> <span class="n">recovery_rate</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="calculate_detection_significance">
+<a class="viewcode-back" href="../../api/validation.html#transitkit.validation.calculate_detection_significance">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">calculate_detection_significance</span><span class="p">(</span><span class="n">bls_result</span><span class="p">,</span> <span class="n">n_shuffles</span><span class="o">=</span><span class="mi">1000</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate detection significance via data shuffling.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Extract data from BLS result</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">bls_result</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+        <span class="n">best_power</span> <span class="o">=</span> <span class="n">bls_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;power&quot;</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">bls_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;time&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="n">flux</span> <span class="o">=</span> <span class="n">bls_result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;flux&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># Assume it&#39;s a BLS object</span>
+        <span class="n">best_power</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">bls_result</span><span class="o">.</span><span class="n">power</span><span class="o">.</span><span class="n">power</span><span class="p">)</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">bls_result</span><span class="o">.</span><span class="n">t</span>
+        <span class="n">flux</span> <span class="o">=</span> <span class="n">bls_result</span><span class="o">.</span><span class="n">y</span>
+
+    <span class="k">if</span> <span class="n">time</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">flux</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;significance&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;p_value&quot;</span><span class="p">:</span> <span class="mi">1</span><span class="p">}</span>
+
+    <span class="c1"># Shuffle data</span>
+    <span class="n">shuffled_powers</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">n_shuffles</span><span class="p">):</span>
+        <span class="c1"># Shuffle flux while preserving time</span>
+        <span class="n">shuffled_flux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">flux</span><span class="p">)</span>
+
+        <span class="c1"># Run quick BLS on shuffled data</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="c1"># Use a simplified BLS for speed</span>
+            <span class="kn">from</span><span class="w"> </span><span class="nn">astropy.timeseries</span><span class="w"> </span><span class="kn">import</span> <span class="n">BoxLeastSquares</span>
+
+            <span class="n">bls_shuffled</span> <span class="o">=</span> <span class="n">BoxLeastSquares</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">shuffled_flux</span><span class="p">)</span>
+
+            <span class="c1"># Use a small period grid around interesting region</span>
+            <span class="n">periods</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="mi">20</span><span class="p">,</span> <span class="mi">100</span><span class="p">)</span>
+            <span class="n">durations</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.05</span><span class="p">,</span> <span class="mf">0.1</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">])</span>
+
+            <span class="n">power_shuffled</span> <span class="o">=</span> <span class="n">bls_shuffled</span><span class="o">.</span><span class="n">power</span><span class="p">(</span><span class="n">periods</span><span class="p">,</span> <span class="n">durations</span><span class="p">)</span>
+            <span class="n">shuffled_powers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">max</span><span class="p">(</span><span class="n">power_shuffled</span><span class="o">.</span><span class="n">power</span><span class="p">))</span>
+        <span class="k">except</span><span class="p">:</span>
+            <span class="n">shuffled_powers</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># Calculate p-value</span>
+    <span class="n">shuffled_powers</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">shuffled_powers</span><span class="p">)</span>
+    <span class="n">p_value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">shuffled_powers</span> <span class="o">&gt;=</span> <span class="n">best_power</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">shuffled_powers</span><span class="p">)</span>
+
+    <span class="c1"># Convert to sigma (Gaussian approximation)</span>
+    <span class="k">if</span> <span class="n">p_value</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">sigma</span> <span class="o">=</span> <span class="n">stats</span><span class="o">.</span><span class="n">norm</span><span class="o">.</span><span class="n">ppf</span><span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">p_value</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">sigma</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;p_value&quot;</span><span class="p">:</span> <span class="n">p_value</span><span class="p">,</span>
+        <span class="s2">&quot;significance_sigma&quot;</span><span class="p">:</span> <span class="n">sigma</span><span class="p">,</span>
+        <span class="s2">&quot;best_power&quot;</span><span class="p">:</span> <span class="n">best_power</span><span class="p">,</span>
+        <span class="s2">&quot;mean_shuffled_power&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">shuffled_powers</span><span class="p">),</span>
+        <span class="s2">&quot;std_shuffled_power&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">shuffled_powers</span><span class="p">),</span>
+        <span class="s2">&quot;n_shuffles&quot;</span><span class="p">:</span> <span class="n">n_shuffles</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="assess_multiple_event_statistic">
+<a class="viewcode-back" href="../../api/validation.html#transitkit.validation.assess_multiple_event_statistic">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">assess_multiple_event_statistic</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">duration</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculate Multiple Event Statistic (MES) for transit detection.</span>
+<span class="sd">    Similar to Kepler pipeline.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Phase fold</span>
+    <span class="n">phase</span> <span class="o">=</span> <span class="p">((</span><span class="n">time</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">period</span><span class="p">)</span> <span class="o">%</span> <span class="mi">1</span>
+    <span class="n">phase</span> <span class="o">=</span> <span class="p">(</span><span class="n">phase</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">%</span> <span class="mi">1</span> <span class="o">-</span> <span class="mf">0.5</span>
+
+    <span class="c1"># Identify in-transit points</span>
+    <span class="n">half_width</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">duration</span> <span class="o">/</span> <span class="n">period</span>
+    <span class="n">in_transit</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">phase</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">half_width</span>
+    <span class="n">out_of_transit</span> <span class="o">=</span> <span class="o">~</span><span class="n">in_transit</span>
+
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">in_transit</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;mes&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;n_transits&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
+
+    <span class="c1"># Calculate depth per transit</span>
+    <span class="n">transit_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">floor</span><span class="p">((</span><span class="n">time</span><span class="p">[</span><span class="n">in_transit</span><span class="p">]</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">period</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span><span class="o">.</span><span class="n">astype</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">unique_transits</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">transit_indices</span><span class="p">)</span>
+
+    <span class="n">depths</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">transit_n</span> <span class="ow">in</span> <span class="n">unique_transits</span><span class="p">:</span>
+        <span class="c1"># Points in this specific transit</span>
+        <span class="n">mask</span> <span class="o">=</span> <span class="n">transit_indices</span> <span class="o">==</span> <span class="n">transit_n</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">mask</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="c1"># Compare with nearby out-of-transit points</span>
+        <span class="n">transit_time</span> <span class="o">=</span> <span class="n">t0</span> <span class="o">+</span> <span class="n">transit_n</span> <span class="o">*</span> <span class="n">period</span>
+        <span class="n">time_window</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">duration</span>
+
+        <span class="n">nearby_oot</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="p">(</span><span class="n">time</span> <span class="o">&gt;=</span> <span class="n">transit_time</span> <span class="o">-</span> <span class="n">time_window</span><span class="p">)</span>
+            <span class="o">&amp;</span> <span class="p">(</span><span class="n">time</span> <span class="o">&lt;=</span> <span class="n">transit_time</span> <span class="o">+</span> <span class="n">time_window</span><span class="p">)</span>
+            <span class="o">&amp;</span> <span class="n">out_of_transit</span>
+        <span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">nearby_oot</span><span class="p">)</span> <span class="o">&lt;</span> <span class="mi">5</span><span class="p">:</span>
+            <span class="k">continue</span>
+
+        <span class="n">depth</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">flux</span><span class="p">[</span><span class="n">nearby_oot</span><span class="p">])</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">flux</span><span class="p">[</span><span class="n">in_transit</span><span class="p">][</span><span class="n">mask</span><span class="p">])</span>
+        <span class="n">depths</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">depth</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">depths</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;mes&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">,</span> <span class="s2">&quot;n_transits&quot;</span><span class="p">:</span> <span class="mi">0</span><span class="p">}</span>
+
+    <span class="c1"># Calculate MES</span>
+    <span class="n">mean_depth</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">depths</span><span class="p">)</span>
+    <span class="n">depth_uncertainty</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">depths</span><span class="p">)</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">depths</span><span class="p">))</span>
+
+    <span class="n">mes</span> <span class="o">=</span> <span class="n">mean_depth</span> <span class="o">/</span> <span class="n">depth_uncertainty</span> <span class="k">if</span> <span class="n">depth_uncertainty</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;mes&quot;</span><span class="p">:</span> <span class="n">mes</span><span class="p">,</span>
+        <span class="s2">&quot;n_transits&quot;</span><span class="p">:</span> <span class="nb">len</span><span class="p">(</span><span class="n">depths</span><span class="p">),</span>
+        <span class="s2">&quot;mean_depth&quot;</span><span class="p">:</span> <span class="n">mean_depth</span><span class="p">,</span>
+        <span class="s2">&quot;depth_uncertainty&quot;</span><span class="p">:</span> <span class="n">depth_uncertainty</span><span class="p">,</span>
+        <span class="s2">&quot;individual_depths&quot;</span><span class="p">:</span> <span class="n">depths</span><span class="p">,</span>
+    <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="validate_against_secondary_eclipse">
+<a class="viewcode-back" href="../../api/validation.html#transitkit.validation.validate_against_secondary_eclipse">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_against_secondary_eclipse</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">flux</span><span class="p">,</span> <span class="n">period</span><span class="p">,</span> <span class="n">t0</span><span class="p">,</span> <span class="n">duration</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Check for secondary eclipse to validate planet detection.</span>
+<span class="sd">    Secondary eclipse at phase 0.5 if eccentric.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># Look at phase 0.5 ± duration</span>
+    <span class="n">phase</span> <span class="o">=</span> <span class="p">((</span><span class="n">time</span> <span class="o">-</span> <span class="n">t0</span><span class="p">)</span> <span class="o">/</span> <span class="n">period</span><span class="p">)</span> <span class="o">%</span> <span class="mi">1</span>
+
+    <span class="c1"># Primary transit region</span>
+    <span class="n">primary_phase</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="n">primary_region</span> <span class="o">=</span> <span class="p">(</span><span class="n">phase</span> <span class="o">&gt;</span> <span class="n">primary_phase</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">duration</span> <span class="o">/</span> <span class="n">period</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span>
+        <span class="n">phase</span> <span class="o">&lt;</span> <span class="n">primary_phase</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">duration</span> <span class="o">/</span> <span class="n">period</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Secondary eclipse region</span>
+    <span class="n">secondary_phase</span> <span class="o">=</span> <span class="mf">0.5</span>
+    <span class="n">secondary_region</span> <span class="o">=</span> <span class="p">(</span><span class="n">phase</span> <span class="o">&gt;</span> <span class="n">secondary_phase</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">duration</span> <span class="o">/</span> <span class="n">period</span><span class="p">)</span> <span class="o">&amp;</span> <span class="p">(</span>
+        <span class="n">phase</span> <span class="o">&lt;</span> <span class="n">secondary_phase</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">duration</span> <span class="o">/</span> <span class="n">period</span>
+    <span class="p">)</span>
+
+    <span class="c1"># Compare depths</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">primary_region</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">5</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">secondary_region</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">5</span><span class="p">:</span>
+        <span class="n">primary_depth</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">flux</span><span class="p">[</span><span class="n">primary_region</span><span class="p">])</span>
+        <span class="n">secondary_depth</span> <span class="o">=</span> <span class="mi">1</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">median</span><span class="p">(</span><span class="n">flux</span><span class="p">[</span><span class="n">secondary_region</span><span class="p">])</span>
+
+        <span class="c1"># Secondary should be much smaller or non-existent for non-irradiated planets</span>
+        <span class="n">secondary_ratio</span> <span class="o">=</span> <span class="n">secondary_depth</span> <span class="o">/</span> <span class="n">primary_depth</span> <span class="k">if</span> <span class="n">primary_depth</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;primary_depth&quot;</span><span class="p">:</span> <span class="n">primary_depth</span><span class="p">,</span>
+            <span class="s2">&quot;secondary_depth&quot;</span><span class="p">:</span> <span class="n">secondary_depth</span><span class="p">,</span>
+            <span class="s2">&quot;secondary_ratio&quot;</span><span class="p">:</span> <span class="n">secondary_ratio</span><span class="p">,</span>
+            <span class="s2">&quot;has_secondary&quot;</span><span class="p">:</span> <span class="n">secondary_ratio</span> <span class="o">&gt;</span> <span class="mf">0.1</span><span class="p">,</span>  <span class="c1"># Arbitrary threshold</span>
+            <span class="s2">&quot;n_primary&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">primary_region</span><span class="p">),</span>
+            <span class="s2">&quot;n_secondary&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">secondary_region</span><span class="p">),</span>
+        <span class="p">}</span>
+
+    <span class="k">return</span> <span class="p">{</span>
+        <span class="s2">&quot;primary_depth&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;secondary_depth&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;secondary_ratio&quot;</span><span class="p">:</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="s2">&quot;has_secondary&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="s2">&quot;n_primary&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">primary_region</span><span class="p">),</span>
+        <span class="s2">&quot;n_secondary&quot;</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">secondary_region</span><span class="p">),</span>
+    <span class="p">}</span></div>
+
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2025, Arif Solmaz.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

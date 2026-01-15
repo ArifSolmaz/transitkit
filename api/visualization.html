@@ -58,7 +58,20 @@
 <li class="toctree-l1"><a class="reference internal" href="analysis.html">Analysis Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="validation.html">Validation Module</a></li>
 <li class="toctree-l1"><a class="reference internal" href="io.html">I/O Module</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">Visualization Module</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Visualization Module</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.create_parameter_table"><code class="docutils literal notranslate"><span class="pre">create_parameter_table()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.create_transit_report_figure"><code class="docutils literal notranslate"><span class="pre">create_transit_report_figure()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_full_light_curve"><code class="docutils literal notranslate"><span class="pre">plot_full_light_curve()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_individual_transit"><code class="docutils literal notranslate"><span class="pre">plot_individual_transit()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_mcmc_corner"><code class="docutils literal notranslate"><span class="pre">plot_mcmc_corner()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_periodogram_comparison"><code class="docutils literal notranslate"><span class="pre">plot_periodogram_comparison()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_phase_folded"><code class="docutils literal notranslate"><span class="pre">plot_phase_folded()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_residuals"><code class="docutils literal notranslate"><span class="pre">plot_residuals()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_transit_duration_scan"><code class="docutils literal notranslate"><span class="pre">plot_transit_duration_scan()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.plot_transit_summary"><code class="docutils literal notranslate"><span class="pre">plot_transit_summary()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="#transitkit.visualization.setup_publication_style"><code class="docutils literal notranslate"><span class="pre">setup_publication_style()</span></code></a></li>
+</ul>
+</li>
 </ul>
 <p class="caption" role="heading"><span class="caption-text">Development</span></p>
 <ul>
@@ -92,6 +105,107 @@
   <section id="visualization-module">
 <h1>Visualization Module<a class="headerlink" href="#visualization-module" title="Link to this heading"></a></h1>
 <p>Plotting and figure generation.</p>
+<p id="module-transitkit.visualization">Publication-quality visualization tools for transit light curves.</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.create_parameter_table">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">create_parameter_table</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#create_parameter_table"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.create_parameter_table" title="Link to this definition"></a></dt>
+<dd><p>Create parameter table for report.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.create_transit_report_figure">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">create_transit_report_figure</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">filename</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">format</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'pdf'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#create_transit_report_figure"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.create_transit_report_figure" title="Link to this definition"></a></dt>
+<dd><p>Create complete transit report figure for publication.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.plot_full_light_curve">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_full_light_curve</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'k'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_full_light_curve"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_full_light_curve" title="Link to this definition"></a></dt>
+<dd><p>Plot full light curve with transit markers.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.plot_individual_transit">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_individual_transit</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">epoch</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">window_factor</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_individual_transit"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_individual_transit" title="Link to this definition"></a></dt>
+<dd><p>Plot individual transit with model fit.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.plot_mcmc_corner">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_mcmc_corner</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">samples</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param_names</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">truths</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(10,</span> <span class="pre">10)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_mcmc_corner"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_mcmc_corner" title="Link to this definition"></a></dt>
+<dd><p>Plot MCMC corner plot for transit parameters.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.plot_periodogram_comparison">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_periodogram_comparison</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">periods</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">powers_bls</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">powers_gls</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">powers_pdm</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">best_period</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_periodogram_comparison"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_periodogram_comparison" title="Link to this definition"></a></dt>
+<dd><p>Plot comparison of different periodogram methods.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.plot_phase_folded">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_phase_folded</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">bins</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">200</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'k'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'r'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_phase_folded"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_phase_folded" title="Link to this definition"></a></dt>
+<dd><p>Plot phase-folded light curve with binned data and model.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.plot_residuals">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_residuals</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">residuals</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">color</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'k'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.6</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">ms</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_residuals"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_residuals" title="Link to this definition"></a></dt>
+<dd><p>Plot fit residuals.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>ax</strong> (<em>matplotlib.axes.Axes</em>) – Axes to plot on</p></li>
+<li><p><strong>time</strong> (<em>array</em>) – Time array</p></li>
+<li><p><strong>residuals</strong> (<em>array</em>) – Residual values (data - model)</p></li>
+<li><p><strong>color</strong> (<a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#str" title="(in Python v3.14)"><em>str</em></a>) – Point color</p></li>
+<li><p><strong>alpha</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#float" title="(in Python v3.14)"><em>float</em></a>) – Point transparency</p></li>
+<li><p><strong>ms</strong> (<a class="reference external" href="https://docs.python.org/3/library/functions.html#int" title="(in Python v3.14)"><em>int</em></a>) – Marker size</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>ax</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.axes.Axes</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.plot_transit_duration_scan">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_transit_duration_scan</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ax</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">period</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">t0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">durations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metrics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">metric_name</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'SNR'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_transit_duration_scan"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_transit_duration_scan" title="Link to this definition"></a></dt>
+<dd><p>Plot transit duration scan results.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.plot_transit_summary">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">plot_transit_summary</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">flux</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">params</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">residuals</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">figsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">(12,</span> <span class="pre">10)</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#plot_transit_summary"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.plot_transit_summary" title="Link to this definition"></a></dt>
+<dd><p>Create comprehensive transit summary plot.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>time</strong> (<em>array</em>) – Time array</p></li>
+<li><p><strong>flux</strong> (<em>array</em>) – Flux array</p></li>
+<li><p><strong>params</strong> (<a class="reference internal" href="core.html#transitkit.core.TransitParameters" title="transitkit.core.TransitParameters"><em>TransitParameters</em></a><em> or </em><a class="reference external" href="https://docs.python.org/3/library/stdtypes.html#dict" title="(in Python v3.14)"><em>dict</em></a>) – Transit parameters</p></li>
+<li><p><strong>residuals</strong> (<em>array</em><em>, </em><em>optional</em>) – Fit residuals</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>fig</strong></p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>matplotlib.figure.Figure</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="transitkit.visualization.setup_publication_style">
+<span class="sig-prename descclassname"><span class="pre">transitkit.visualization.</span></span><span class="sig-name descname"><span class="pre">setup_publication_style</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">fontsize</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">12</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dpi</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">300</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">style</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'default'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/transitkit/visualization.html#setup_publication_style"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#transitkit.visualization.setup_publication_style" title="Link to this definition"></a></dt>
+<dd><p>Set up matplotlib for publication-quality figures.</p>
+</dd></dl>
+
 </section>
 
 
