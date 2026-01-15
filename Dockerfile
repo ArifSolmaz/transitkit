@@ -15,7 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY pyproject.toml README.md ./
 COPY src/ ./src/
 
-RUN pip install --no-cache-dir -e ".[full]"
+RUN pip install --no-cache-dir -e "."
 
 RUN useradd -m transitkit
 USER transitkit
