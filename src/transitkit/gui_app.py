@@ -2610,14 +2610,15 @@ def main():
         
         # Try to show error in simple message box
         try:
+            import tkinter as tk
+            from tkinter import messagebox
             root = tk.Tk()
             root.withdraw()
             messagebox.showerror(
                 "Fatal Error",
-                f"Failed to start TransitKit:\n\n{str(e)}\n\n"
-                f"Check console for details."
+                f"Failed to start TransitKit:\n\n{str(e)}\n\nCheck console for details."
             )
-        except:
+        except Exception:
             pass
 
 if __name__ == "__main__":
