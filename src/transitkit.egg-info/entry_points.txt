@@ -1,12 +1,2 @@
 [console_scripts]
 transitkit = transitkit.cli:main
-transitkit-gui = transitkit.gui_app:main
-transitkit-mcmc = transitkit.cli:mcmc_command
-transitkit-ttv = transitkit.cli:ttv_command
-
-[transitkit.plugins]
-bls = transitkit.core:find_transits_bls_advanced
-export = transitkit.io:export_transit_results
-gls = transitkit.core:find_period_gls
-gp_detrend = transitkit.analysis:detrend_light_curve_gp
-pdm = transitkit.core:find_period_pdm

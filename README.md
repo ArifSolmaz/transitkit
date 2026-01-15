@@ -1,17 +1,12 @@
 # TransitKit v2.0
 
-[![PyPI version](https://badge.fury.io/py/transitkit.svg)](https://badge.fury.io/py/transitkit)
 [![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![Tests](https://github.com/arifsolmaz/transitkit/actions/workflows/test.yml/badge.svg)](https://github.com/arifsolmaz/transitkit/actions/workflows/test.yml)
-[![codecov](https://codecov.io/gh/arifsolmaz/transitkit/branch/main/graph/badge.svg)](https://codecov.io/gh/arifsolmaz/transitkit)
-[![Documentation Status](https://readthedocs.org/projects/transitkit/badge/?version=latest)](https://transitkit.readthedocs.io/en/latest/?badge=latest)
+[![Tests](https://github.com/arifsolmaz/transitkit/actions/workflows/tests.yml/badge.svg)](https://github.com/arifsolmaz/transitkit/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 **Professional Exoplanet Transit Light Curve Analysis Toolkit**
 
 TransitKit is a comprehensive Python package for analyzing exoplanet transit light curves. It provides publication-quality tools for transit detection, parameter estimation, validation, and visualization.
-
-![Transit Example](example_transit.png)
 
 ## Features
 
@@ -46,14 +41,14 @@ pip install transitkit
 
 ### With All Features
 ```bash
-pip install transitkit[all]
+pip install "transitkit[full]"
 ```
 
 ### Development Installation
 ```bash
 git clone https://github.com/arifsolmaz/transitkit.git
 cd transitkit
-pip install -e ".[dev,all]"
+pip install -e ".[dev,full]"
 ```
 
 ### Optional Dependencies
@@ -62,8 +57,7 @@ pip install -e ".[dev,all]"
 |-------|----------|----------|
 | `mcmc` | emcee, corner | MCMC parameter estimation |
 | `cli` | click, rich | Command-line interface |
-| `gui` | emcee, corner | GUI application |
-| `all` | All above + batman | Full functionality |
+| `full` | All above + batman | Full functionality |
 | `dev` | pytest, black, etc. | Development |
 | `docs` | sphinx, etc. | Documentation building |
 
@@ -73,7 +67,6 @@ pip install -e ".[dev,all]"
 
 ```python
 import numpy as np
-import transitkit as tk
 from transitkit.core import (
     generate_transit_signal_mandel_agol,
     find_transits_bls_advanced,
@@ -168,25 +161,21 @@ fig.savefig('transit_report.pdf', bbox_inches='tight')
 
 ## Command-Line Interface
 
+> **Note:** CLI requires the `cli` extra: `pip install "transitkit[cli]"`
+
 ```bash
 # Get version info
 transitkit version
 
-# Load and analyze TESS data
-transitkit data load "TIC 25155310" --mission TESS --sectors 1,2
-
 # Run BLS detection
 transitkit analyze detect lightcurve.csv --method bls --min-period 1 --max-period 20
-
-# Create summary plot
-transitkit plot summary lightcurve.csv --period 5.0 --t0 2.5 --output transit.pdf
 ```
 
 ## GUI Application
 
 ```bash
-# Launch the GUI
-transitkit-gui
+# Launch the GUI (requires: pip install "transitkit[full]")
+python -m transitkit.gui_app
 ```
 
 Or from Python:
@@ -244,7 +233,7 @@ If you use TransitKit in your research, please cite:
 @software{transitkit,
   author = {Solmaz, Arif},
   title = {TransitKit: Professional Exoplanet Transit Analysis Toolkit},
-  year = {2024},
+  year = {2025},
   url = {https://github.com/arifsolmaz/transitkit},
   version = {2.0.0}
 }

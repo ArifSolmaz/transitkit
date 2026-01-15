@@ -1,7 +1,21 @@
+CHANGELOG.md
+LICENSE
+MANIFEST.in
 README.md
 pyproject.toml
+setup.cfg
+setup.py
+docs/api_reference.rst
+docs/conf.py
+docs/development.rst
+docs/getting_started.rst
+docs/index.md
+docs/index.rst
+docs/tutorials.rst
+docs/user_guide.rst
 src/transitkit/__init__.py
 src/transitkit/__main__.py
+src/transitkit/__version__.py
 src/transitkit/analysis.py
 src/transitkit/cli.py
 src/transitkit/core.py
@@ -9,6 +23,7 @@ src/transitkit/gui_app.py
 src/transitkit/io.py
 src/transitkit/models.py
 src/transitkit/nea.py
+src/transitkit/py.typed
 src/transitkit/utils.py
 src/transitkit/validation.py
 src/transitkit/visualization.py
@@ -18,4 +33,7 @@ src/transitkit.egg-info/dependency_links.txt
 src/transitkit.egg-info/entry_points.txt
 src/transitkit.egg-info/requires.txt
 src/transitkit.egg-info/top_level.txt
+tests/__init__.py
+tests/conftest.py
 tests/test_basic.py
+tests/integration/__init__.py
