@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "transitkit"
+dynamic = ["version"]
+description = "Professional Exoplanet Transit Light Curve Analysis Toolkit"
+readme = "README.md"
+license = {text = "MIT"}
+authors = [{name = "Arif Solmaz", email = "arif.solmaz@gmail.com"}]
+keywords = ["exoplanet", "transit", "photometry", "astronomy", "TESS", "Kepler", "BLS", "TTV"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Astronomy",
+]
+requires-python = ">=3.9"
+dependencies = ["numpy>=1.21", "scipy>=1.8", "matplotlib>=3.5", "astropy>=5.1", "lightkurve>=2.3", "pandas>=1.4", "scikit-learn>=1.0", "seaborn>=0.12", "h5py>=3.6", "streamlit>=1.24"]
+
+[project.optional-dependencies]
+mcmc = ["emcee>=3.1", "corner>=2.2"]
+cli = ["click>=8.0", "rich>=12.0"]
+full = ["emcee>=3.1", "corner>=2.2", "batman-package>=2.4", "click>=8.0", "rich>=12.0", "h5py>=3.6"]
+dev = ["pytest>=7.0", "pytest-cov>=4.0", "black>=23.0", "isort>=5.12", "flake8>=6.0", "mypy>=1.0", "pre-commit>=3.0"]
+docs = ["sphinx>=6.0", "sphinx-rtd-theme>=1.2", "myst-parser>=1.0", "nbsphinx>=0.9", "ipykernel"]
+
+[project.scripts]
+transitkit = "transitkit.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/arifsolmaz/transitkit"
+Documentation = "https://transitkit.readthedocs.io"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "transitkit.__version__.__version__"}
+
+[tool.setuptools.package-data]
+transitkit = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = ["-v", "--tb=short"]
+markers = ["slow: slow tests", "network: requires network"]
+
+[tool.black]
+line-length = 100
+
+[tool.isort]
+profile = "black"
