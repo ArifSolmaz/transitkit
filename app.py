@@ -1528,17 +1528,42 @@ def page_multi_mission():
         
         # Extract relevant columns based on mission
         if mission == 'TESS':
-            # Extract sector from observation ID
+            # Extract sector from observation ID - format: tess2023xyz-s0070-...
+            # Must match -s followed by 4 digits then - to avoid matching year
             sectors = []
             for obs_id in search_df.get('obs_id', search_df.get('observation', [''] * len(search_df))):
                 import re
-                match = re.search(r's(\d{4})', str(obs_id))
+                # Look for -sNNNN- pattern (sector with dashes)
+                match = re.search(r'-s(\d{4})-', str(obs_id))
                 if match:
                     sectors.append(int(match.group(1)))
                 else:
+                    # Fallback: try to get from mission column or sequence_number
                     sectors.append(None)
+            
             search_df['Sector'] = sectors
-            display_cols = ['Sector', 'author', 'exptime', 't_exptime']
+            
+            # Create readable cadence column from exposure time
+            def get_cadence_label(exp):
+                try:
+                    exp = float(exp)
+                    if exp <= 20:
+                        return "20s (fast)"
+                    elif exp <= 120:
+                        return "2-min (short)"
+                    elif exp <= 600:
+                        return "10-min (FFI)"
+                    else:
+                        return "30-min (long)"
+                except:
+                    return str(exp)
+            
+            if 't_exptime' in search_df.columns:
+                search_df['Cadence'] = search_df['t_exptime'].apply(get_cadence_label)
+            elif 'exptime' in search_df.columns:
+                search_df['Cadence'] = search_df['exptime'].apply(get_cadence_label)
+            
+            display_cols = ['Sector', 'author', 'Cadence']
             group_col = 'Sector'
         elif mission == 'Kepler':
             search_df['Quarter'] = search_df.get('quarter', range(len(search_df)))
@@ -1590,7 +1615,7 @@ def page_multi_mission():
         # Cadence selection
         col1, col2, col3 = st.columns(3)
         with col1:
-            cadence_options = ["Any", "short", "long", "fast"]
+            cadence_options = ["Any", "20s (fast)", "2-min (short)", "10-min (FFI)", "30-min (long)"]
             cadence = st.selectbox("Cadence", cadence_options, index=0)
         with col2:
             author_options = ["Any"] + list(search_df['author'].unique()) if 'author' in search_df.columns else ["Any"]
@@ -1627,10 +1652,22 @@ def page_multi_mission():
                 else:
                     indices = selected
                 
-                # Apply cadence filter
-                if cadence != "Any" and 'exptime' in search_df.columns:
-                    cadence_mask = search_df['exptime'].str.contains(cadence, case=False, na=False)
-                    indices = [i for i in indices if (cadence_mask.iloc[i] if i < len(cadence_mask) else True)]
+                # Apply cadence filter using numeric exposure time
+                if cadence != "Any":
+                    exp_col = 't_exptime' if 't_exptime' in search_df.columns else 'exptime'
+                    if exp_col in search_df.columns:
+                        # Map cadence selection to exposure time ranges
+                        cadence_ranges = {
+                            "20s (fast)": (0, 30),
+                            "2-min (short)": (30, 180),
+                            "10-min (FFI)": (180, 900),
+                            "30-min (long)": (900, 3600)
+                        }
+                        if cadence in cadence_ranges:
+                            min_exp, max_exp = cadence_ranges[cadence]
+                            exp_values = pd.to_numeric(search_df[exp_col], errors='coerce')
+                            cadence_mask = (exp_values >= min_exp) & (exp_values < max_exp)
+                            indices = [i for i in indices if (cadence_mask.iloc[i] if i < len(cadence_mask) else True)]
                 
                 # Apply author filter
                 if author != "Any" and 'author' in search_df.columns:
